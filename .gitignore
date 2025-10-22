@@ -1,0 +1,8 @@
+venv/
+.env
+*.pyc
+__pycache__/
+output/
+*.xlsx
+.DS_Store
+config/config.json
