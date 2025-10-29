@@ -155,6 +155,34 @@ class BrandAnalyzer:
         
         return detected
     
+    def detect_sentiment(self, response: str) -> str:
+        """Detect sentiment/tone: P (Positive), N (Negative), N (Neutral)"""
+        response_lower = response.lower()
+        
+        # Positive indicators
+        positive_words = [
+            "excellent", "great", "good", "best", "high quality", "comfortable",
+            "reliable", "recommended", "love", "perfect", "amazing", "fantastic",
+            "outstanding", "superior", "impressive"
+        ]
+        
+        # Negative indicators
+        negative_words = [
+            "poor", "bad", "worst", "uncomfortable", "unreliable", "avoid",
+            "disappointed", "terrible", "awful", "waste", "regret", "inferior",
+            "subpar", "lacking"
+        ]
+        
+        positive_count = sum(1 for word in positive_words if word in response_lower)
+        negative_count = sum(1 for word in negative_words if word in response_lower)
+        
+        if positive_count > negative_count and positive_count > 0:
+            return "P"
+        elif negative_count > positive_count and negative_count > 0:
+            return "N"
+        else:
+            return "N"  # Neutral
+    
     def analyze_single_response(self, query: str, response: str, 
                                query_brands: List[str]) -> Dict[str, Any]:
         """Analyze a single response"""
@@ -167,12 +195,14 @@ class BrandAnalyzer:
         sources = self.extract_sources(response)
         models = self.extract_models(response)
         key_messages = self.detect_key_messages(response)
+        sentiment = self.detect_sentiment(response)
         
         return {
             'brands': all_brands,
             'sources': sources,
             'models': models,
-            'key_messages': key_messages
+            'key_messages': key_messages,
+            'sentiment': sentiment
         }
     
     def aggregate_results(self, query: str, results: List[Dict[str, Any]], 
