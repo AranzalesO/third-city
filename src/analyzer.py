@@ -1,3 +1,4 @@
+
 """
 Brand Analyzer - Core analysis engine
 """
@@ -116,34 +117,74 @@ class BrandAnalyzer:
                 if model.lower() in response_lower:
                     models_found.append(model)
         
-        # Generic model patterns
+        # Generic model patterns - only very specific ones
         patterns = [
-            r'\b([A-Z][a-z]+(?:\s[A-Z0-9][a-zA-Z0-9]*)+)',
-            r'\b(\d{3,4})\b',
-            r'\b([A-Z]{2,}(?:\s\d+)?)\b',
+            r'\b(\d{4})\b',  # 4-digit numbers only (like 1460, 2976)
         ]
         
         for pattern in patterns:
             matches = re.findall(pattern, response)
             models_found.extend(matches)
         
-        # Filter stop words
+        # Comprehensive stop words - filter out false positives
         stop_words = [
+            # Generic words
             'The', 'This', 'That', 'These', 'Those', 'When', 'Where', 'What', 'Which',
-            'Sandals', 'Sandal', 'Breaking', 'Walking', 'Summer', 'Style', 'Styles',
-            'UK', 'ASOS', 'Amazon', 'Official', 'Website', 'Comfort', 'Quality',
-            'Support', 'Durability', 'Value', 'Price', 'Point', 'Options', 'Strap',
-            'Technology', 'PVC', 'Width', 'Edgy', 'Major', 'High', 'Street', 'Brands'
+            'Some', 'Many', 'Most', 'Best', 'Good', 'Great', 'Very', 'More', 'Less',
+            
+            # Product categories (not specific models)
+            'Sandals', 'Sandal', 'Boot', 'Boots', 'Shoe', 'Shoes', 'Footwear',
+            'Breaking', 'Walking', 'Summer', 'Winter', 'Spring', 'Style', 'Styles',
+            
+            # Retailers and websites
+            'UK', 'ASOS', 'Amazon', 'Official', 'Website', 'John', 'Lewis', 'Schuh',
+            'Office', 'Clarks', 'Next', 'Debenhams', 'Selfridges', 'Harrods',
+            
+            # Attributes (not models)
+            'Comfort', 'Quality', 'Support', 'Durability', 'Value', 'Price', 'Point',
+            'Options', 'Strap', 'Technology', 'PVC', 'Width', 'Edgy', 'Major', 
+            'High', 'Street', 'Brands', 'Leather', 'Vegan', 'Classic', 'Modern',
+            
+            # Months and temporal
+            'January', 'February', 'March', 'April', 'May', 'June', 'July',
+            'August', 'September', 'October', 'November', 'December',
+            'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+            
+            # Generic descriptors
+            'Collection', 'Range', 'Series', 'Line', 'Model', 'Version', 'Edition',
+            'Platform', 'Chunky', 'Lightweight', 'Heavy', 'Durable', 'Comfortable'
         ]
         
-        models_found = [m.strip() for m in models_found 
-                       if m.strip() and m not in stop_words and len(m.strip()) > 1]
+        # Filter models
+        filtered_models = []
+        for model in models_found:
+            model_clean = model.strip()
+            
+            # Skip if empty or too short
+            if not model_clean or len(model_clean) <= 1:
+                continue
+            
+            # Skip if in stop words (case insensitive)
+            if model_clean in stop_words or model_clean.lower() in [s.lower() for s in stop_words]:
+                continue
+            
+            # Skip years (2020-2030)
+            if model_clean.isdigit() and len(model_clean) == 4:
+                year = int(model_clean)
+                if 2020 <= year <= 2030:
+                    continue
+            
+            # Skip if it contains "UK" or other common suffixes
+            if any(suffix in model_clean for suffix in ['UK', 'US', 'EU', ' Ltd', ' Inc']):
+                continue
+            
+            # Skip if it looks like a date pattern
+            if re.match(r'\d{1,2}[/-]\d{1,2}', model_clean):
+                continue
+            
+            filtered_models.append(model_clean)
         
-        # Filter years
-        models_found = [m for m in models_found 
-                       if not (m.isdigit() and len(m) == 4 and 2020 <= int(m) <= 2030)]
-        
-        return list(set(models_found))
+        return list(set(filtered_models))
     
     def detect_key_messages(self, response: str) -> Dict[str, bool]:
         """Detect which key messages are present"""

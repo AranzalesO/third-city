@@ -31,7 +31,7 @@ class ModelNormalizer:
             "Vegan Clarissa": ["vegan clarissa", "clarissa vegan"],
             
             # Numeric models
-            "1460": ["1460", "1460 boot", "1460 sandal"],
+            "1460": ["1460", "1460 boot"],
             "2976": ["2976", "2976 boot"],
             "1461": ["1461", "1461 shoe"],
         }
@@ -41,6 +41,9 @@ class ModelNormalizer:
         for normalized, variations in self.dr_martens_sandals.items():
             for variant in variations:
                 self.variation_to_normalized[variant.lower()] = normalized
+        
+        # Valid numeric models (4-digit codes)
+        self.valid_numeric_models = {"1460", "2976", "1461", "8053", "1490"}
     
     def normalize_model(self, model_text: str) -> str:
         """Normalize a model name to its canonical form"""
@@ -50,13 +53,21 @@ class ModelNormalizer:
         if model_lower in self.variation_to_normalized:
             return self.variation_to_normalized[model_lower]
         
-        # Partial match
+        # Check if it's a valid numeric model
+        if model_text.isdigit() and len(model_text) == 4:
+            if model_text in self.valid_numeric_models:
+                return model_text
+            else:
+                # Unknown 4-digit code - filter out
+                return None
+        
+        # Partial match for known styles
         for variant, normalized in self.variation_to_normalized.items():
             if variant in model_lower or model_lower in variant:
                 return normalized
         
-        # No match found, return original
-        return model_text
+        # No match found - filter out
+        return None
     
     def extract_and_normalize_models(self, text: str, brand: str = "Dr Martens") -> List[str]:
         """Extract and normalize model names from text"""
@@ -70,29 +81,10 @@ class ModelNormalizer:
                     found_models.add(normalized)
                     break
         
-        # Also try generic pattern matching
-        generic_models = self._extract_generic_models(text)
-        for model in generic_models:
-            normalized = self.normalize_model(model)
-            if normalized:
-                found_models.add(normalized)
+        # Check for valid numeric models
+        numeric_models = re.findall(r'\b(\d{4})\b', text)
+        for num_model in numeric_models:
+            if num_model in self.valid_numeric_models:
+                found_models.add(num_model)
         
         return sorted(list(found_models))
-    
-    def _extract_generic_models(self, text: str) -> List[str]:
-        """Extract potential model names using patterns"""
-        patterns = [
-            r'\b([A-Z][a-z]+)\s+(?:Sandal|Boot|Shoe)s?\b',  # "Blaire Sandals"
-            r'\b\d{4}\b',  # 4-digit models like "1460"
-        ]
-        
-        models = []
-        for pattern in patterns:
-            matches = re.findall(pattern, text)
-            models.extend(matches)
-        
-        # Filter stop words
-        stop_words = ['Summer', 'Style', 'Walking', 'These', 'Those']
-        models = [m for m in models if m not in stop_words]
-        
-        return models

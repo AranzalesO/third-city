@@ -56,12 +56,18 @@ class QueryProcessor:
             # Analyze response
             analysis = self.analyzer.analyze_single_response(query, response, query_brands)
             
-            # Normalize models
+            # Normalize models - ONLY keep known models
             raw_models = analysis['models']
             normalized_models = []
             for model in raw_models:
                 normalized = self.model_normalizer.normalize_model(model)
-                normalized_models.append(normalized)
+                # Only keep if normalization succeeded (not None)
+                if normalized:
+                    normalized_models.append(normalized)
+            
+            # Also use the comprehensive normalizer
+            additional_models = self.model_normalizer.extract_and_normalize_models(response)
+            normalized_models.extend(additional_models)
             
             analysis['models'] = list(set(normalized_models))
             analysis['platform'] = platform
