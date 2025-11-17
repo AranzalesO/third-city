@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+
+{% block title %}Configure - Brand Monitoring Tool{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📋 Configure Analysis</h2>
+    <p>Set up your brand monitoring campaign</p>
+</div>
+
+<form method="POST" action="{{ url_for('configure') }}" enctype="multipart/form-data" class="config-form">
+    
+    <div class="form-section">
+        <h3>Campaign Details</h3>
+        
+        <div class="form-group">
+            <label for="campaign_name">Campaign Name</label>
+            <input type="text" id="campaign_name" name="campaign_name" 
+                   value="{{ config.campaign_name }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="target_brand">Target Brand *</label>
+            <input type="text" id="target_brand" name="target_brand" 
+                   value="{{ config.target_brand }}" required 
+                   placeholder="e.g., Dr Martens">
+        </div>
+
+        <div class="form-group">
+            <label for="competitors">Competitors (comma-separated)</label>
+            <textarea id="competitors" name="competitors" rows="3" 
+                      placeholder="e.g., Birkenstock, UGG, Crocs">{{ config.competitors }}</textarea>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Queries</h3>
+        
+        <div class="form-group">
+            <label for="queries_text">Enter Queries (one per line)</label>
+            <textarea id="queries_text" name="queries_text" rows="10" 
+                      placeholder="Are Dr Martens sandals comfortable?&#10;Do Dr Martens sandals need breaking in?&#10;Are Dr Martens sandals true to size?"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="queries_file">Or Upload Queries File (.txt)</label>
+            <input type="file" id="queries_file" name="queries_file" accept=".txt">
+            <small>Upload a .txt file with one query per line</small>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Analysis Settings</h3>
+        
+        <div class="form-group">
+            <label for="runs_per_query">Runs Per Query: <span id="runs_value">{{ config.runs_per_query }}</span></label>
+            <input type="range" id="runs_per_query" name="runs_per_query" 
+                   min="5" max="100" value="{{ config.runs_per_query }}" step="5">
+            <small>More runs = more reliable data but longer processing time</small>
+        </div>
+
+        <div class="form-group">
+            <label>Platforms *</label>
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" name="platforms" value="chatgpt" 
+                           {% if 'chatgpt' in config.platforms %}checked{% endif %}>
+                    ChatGPT (Fast, ~3s per call)
+                </label>
+                <label>
+                    <input type="checkbox" name="platforms" value="gemini" 
+                           {% if 'gemini' in config.platforms %}checked{% endif %}>
+                    Gemini (Fast, ~4s per call)
+                </label>
+                <label>
+                    <input type="checkbox" name="platforms" value="perplexity" 
+                           {% if 'perplexity' in config.platforms %}checked{% endif %}>
+                    Perplexity (Slower, ~9s per call)
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save & Continue to Run →</button>
+    </div>
+</form>
+
+<script>
+// Update slider value display
+document.getElementById('runs_per_query').addEventListener('input', function() {
+    document.getElementById('runs_value').textContent = this.value;
+});
+</script>
+{% endblock %}

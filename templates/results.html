@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block title %}Results - Brand Monitoring Tool{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📊 Analysis Results</h2>
+    <p>View and download your completed reports</p>
+</div>
+
+{% if reports %}
+<div class="results-grid">
+    {% for report in reports %}
+    <div class="result-card">
+        <h3>{{ report.filename }}</h3>
+        <div class="result-meta">
+            <span>📅 {{ report.created }}</span>
+            <span>💾 {{ report.size }}</span>
+        </div>
+        <div class="result-actions">
+            <a href="{{ url_for('download', filename=report.filename) }}" class="btn btn-primary btn-sm">
+                📥 Download
+            </a>
+            <form method="POST" action="{{ url_for('delete_report', filename=report.filename) }}" 
+                  style="display:inline;" onsubmit="return confirm('Delete this report?');">
+                <button type="submit" class="btn btn-danger btn-sm">🗑️ Delete</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <p>📭 No reports yet</p>
+    <p>Run an analysis to generate your first report!</p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">Configure New Analysis</a>
+</div>
+{% endif %}
+{% endblock %}
