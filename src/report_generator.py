@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
-from src.config_manager import ConfigManager
+from config_manager import ConfigManager
 
 
 class ReportGenerator:

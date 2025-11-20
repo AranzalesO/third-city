@@ -1,3 +1,4 @@
+# src/web_app.py
 """
 Flask Web Application - Brand Monitoring Tool
 """
@@ -6,24 +7,36 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, s
 from flask_cors import CORS
 import os
 import json
+import sys
 import threading
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from src.config_manager import ConfigManager
-from src.query_processor import QueryProcessor
-from src.report_generator import ReportGenerator
 
-app = Flask(__name__, template_folder='../templates', static_folder='../static')
-app.secret_key = 'your-secret-key-change-this'  # Change this in production
+# Setup paths
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SRC_DIR)
+sys.path.insert(0, SRC_DIR)
+
+# Import our modules (without src. prefix since we added SRC_DIR to path)
+from config_manager import ConfigManager
+from query_processor import QueryProcessor
+from report_generator import ReportGenerator
+
+app = Flask(__name__, 
+            template_folder=os.path.join(PROJECT_ROOT, 'templates'),
+            static_folder=os.path.join(PROJECT_ROOT, 'static'))
+app.secret_key = 'your-secret-key-change-this'
 CORS(app)
 
-# Configuration
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'output'
+# Configuration - Use absolute paths
+UPLOAD_FOLDER = os.path.join(PROJECT_ROOT, 'uploads')
+OUTPUT_FOLDER = os.path.join(PROJECT_ROOT, 'output')
+CONFIG_FOLDER = os.path.join(PROJECT_ROOT, 'config')
 ALLOWED_EXTENSIONS = {'txt'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs(CONFIG_FOLDER, exist_ok=True)
 
 # Global state for tracking analysis progress
 analysis_state = {
@@ -45,7 +58,6 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     """Home page - Configuration form"""
-    # Load existing config if available
     try:
         config = ConfigManager()
         existing_config = {
@@ -71,7 +83,6 @@ def index():
 def configure():
     """Save configuration and redirect to run page"""
     try:
-        # Get form data
         campaign_name = request.form.get('campaign_name', 'Brand Campaign')
         target_brand = request.form.get('target_brand')
         competitors = request.form.get('competitors', '').split(',')
@@ -79,24 +90,20 @@ def configure():
         
         runs_per_query = int(request.form.get('runs_per_query', 15))
         
-        # Get platform selections
         platforms = {
             'chatgpt': 'chatgpt' in request.form.getlist('platforms'),
             'gemini': 'gemini' in request.form.getlist('platforms'),
             'perplexity': 'perplexity' in request.form.getlist('platforms')
         }
         
-        # Get queries from text area or file
         queries_text = request.form.get('queries_text', '').strip()
         queries_file = request.files.get('queries_file')
         
         queries = []
         
         if queries_text:
-            # Parse queries from text area
             queries = [q.strip() for q in queries_text.split('\n') if q.strip()]
         elif queries_file and allowed_file(queries_file.filename):
-            # Read queries from uploaded file
             filename = secure_filename(queries_file.filename)
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             queries_file.save(filepath)
@@ -116,7 +123,6 @@ def configure():
             flash('Please select at least one platform', 'error')
             return redirect(url_for('index'))
         
-        # Create config
         config_data = {
             'campaign_name': campaign_name,
             'target_brand': target_brand,
@@ -135,8 +141,8 @@ def configure():
             'system_prompt': 'Answer as a UK consumer searching online. Keep answers factual and neutral.'
         }
         
-        # Save config
-        with open('config/config.json', 'w') as f:
+        config_file = os.path.join(CONFIG_FOLDER, 'config.json')
+        with open(config_file, 'w') as f:
             json.dump(config_data, f, indent=2)
         
         flash(f'Configuration saved! Ready to analyze {len(queries)} queries', 'success')
@@ -161,7 +167,6 @@ def start_analysis():
     if analysis_state['running']:
         return jsonify({'error': 'Analysis already running'}), 400
     
-    # Reset state
     analysis_state = {
         'running': True,
         'current_query': 0,
@@ -173,7 +178,6 @@ def start_analysis():
         'report_file': None
     }
     
-    # Start analysis in background thread
     thread = threading.Thread(target=run_analysis_background)
     thread.daemon = True
     thread.start()
@@ -186,20 +190,15 @@ def run_analysis_background():
     global analysis_state
     
     try:
-        # Load config
         config = ConfigManager()
         queries = config.get_queries()
         
         analysis_state['total_queries'] = len(queries)
         analysis_state['logs'].append(f"Starting analysis of {len(queries)} queries...")
         
-        # Initialize processor
         processor = QueryProcessor(config)
-        
-        # Run queries
         platform_results = processor.process_all_queries(queries)
         
-        # Generate report
         analysis_state['logs'].append("Generating Excel report...")
         report_gen = ReportGenerator(config)
         report_file = report_gen.create_report(platform_results)
@@ -223,7 +222,6 @@ def status():
 @app.route('/results')
 def results():
     """View past results"""
-    # List all Excel files in output folder
     reports = []
     if os.path.exists(OUTPUT_FOLDER):
         for filename in os.listdir(OUTPUT_FOLDER):
@@ -236,7 +234,6 @@ def results():
                     'created': datetime.fromtimestamp(file_stat.st_ctime).strftime('%Y-%m-%d %H:%M:%S')
                 })
     
-    # Sort by creation time (newest first)
     reports.sort(key=lambda x: x['created'], reverse=True)
     
     return render_template('results.html', reports=reports)
@@ -245,9 +242,10 @@ def results():
 @app.route('/download/<filename>')
 def download(filename):
     """Download a report file"""
-    filepath = os.path.join(OUTPUT_FOLDER, filename)
+    filepath = os.path.join(OUTPUT_FOLDER, secure_filename(filename))
+    
     if os.path.exists(filepath):
-        return send_file(filepath, as_attachment=True)
+        return send_file(filepath, as_attachment=True, download_name=filename)
     else:
         flash('File not found', 'error')
         return redirect(url_for('results'))
@@ -256,7 +254,8 @@ def download(filename):
 @app.route('/delete/<filename>', methods=['POST'])
 def delete_report(filename):
     """Delete a report file"""
-    filepath = os.path.join(OUTPUT_FOLDER, filename)
+    filepath = os.path.join(OUTPUT_FOLDER, secure_filename(filename))
+    
     if os.path.exists(filepath):
         os.remove(filepath)
         flash(f'Deleted {filename}', 'success')
@@ -270,6 +269,8 @@ if __name__ == '__main__':
     print("  BRAND MONITORING TOOL - Web Interface")
     print("="*60)
     print("\n  🌐 Starting web server...")
+    print(f"  📁 Project root: {PROJECT_ROOT}")
+    print(f"  📁 Output folder: {OUTPUT_FOLDER}")
     print("  📍 Open your browser to: http://localhost:5000")
     print("\n" + "="*60 + "\n")
     

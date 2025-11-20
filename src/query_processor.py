@@ -12,10 +12,10 @@ from datetime import datetime
 from typing import List, Dict, Any
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from src.api_clients import LLMClientFactory
-from src.analyzer import BrandAnalyzer
-from src.config_manager import ConfigManager
-from src.model_normalizer import ModelNormalizer
+from api_clients import LLMClientFactory
+from analyzer import BrandAnalyzer
+from config_manager import ConfigManager
+from model_normalizer import ModelNormalizer
 
 
 class QueryProcessor:

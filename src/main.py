@@ -4,10 +4,9 @@ Main Application - Brand Monitoring Tool
 
 import sys
 from datetime import datetime
-from src.config_manager import ConfigManager
-from src.query_processor import QueryProcessor
-from src.report_generator import ReportGenerator
-
+from config_manager import ConfigManager
+from query_processor import QueryProcessor
+from report_generator import ReportGenerator
 
 def print_banner():
     """Print application banner"""
