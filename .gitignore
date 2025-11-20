@@ -1,8 +1,41 @@
+# .env
+# output/
+# *.xlsx
+# .DS_Store
+# config/config.json
+
+# Environment
 venv/
 .env
+.env.local
 *.pyc
 __pycache__/
-output/
-*.xlsx
-.DS_Store
+
+# Output files
+output/*.xlsx
+uploads/*.txt
 config/config.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution
+dist/
+build/
+*.egg-info/

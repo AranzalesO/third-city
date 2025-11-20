@@ -21,11 +21,12 @@ sys.path.insert(0, SRC_DIR)
 from config_manager import ConfigManager
 from query_processor import QueryProcessor
 from report_generator import ReportGenerator
+import secrets
 
 app = Flask(__name__, 
             template_folder=os.path.join(PROJECT_ROOT, 'templates'),
             static_folder=os.path.join(PROJECT_ROOT, 'static'))
-app.secret_key = 'your-secret-key-change-this'
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 CORS(app)
 
 # Configuration - Use absolute paths
@@ -265,13 +266,23 @@ def delete_report(filename):
 
 
 if __name__ == '__main__':
-    print("\n" + "="*60)
-    print("  BRAND MONITORING TOOL - Web Interface")
-    print("="*60)
-    print("\n  🌐 Starting web server...")
-    print(f"  📁 Project root: {PROJECT_ROOT}")
-    print(f"  📁 Output folder: {OUTPUT_FOLDER}")
-    print("  📍 Open your browser to: http://localhost:5000")
-    print("\n" + "="*60 + "\n")
+    # Check if running in production
+    is_production = os.environ.get('RENDER') or os.environ.get('PORT')
     
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    if is_production:
+        # Production mode
+        port = int(os.environ.get('PORT', 5000))
+        print(f"Starting production server on port {port}...")
+        app.run(debug=False, port=port, host='0.0.0.0')
+    else:
+        # Development mode
+        print("\n" + "="*60)
+        print("  BRAND MONITORING TOOL - Web Interface")
+        print("="*60)
+        print("\n  🌐 Starting web server...")
+        print(f"  📁 Project root: {PROJECT_ROOT}")
+        print(f"  📁 Output folder: {OUTPUT_FOLDER}")
+        print("  📍 Open your browser to: http://localhost:5000")
+        print("\n" + "="*60 + "\n")
+        
+        app.run(debug=True, port=5000, host='0.0.0.0')
