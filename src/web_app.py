@@ -84,19 +84,45 @@ def index():
 def configure():
     """Save configuration and redirect to run page"""
     try:
+        # Get form data
         campaign_name = request.form.get('campaign_name', 'Brand Campaign')
         target_brand = request.form.get('target_brand')
         competitors = request.form.get('competitors', '').split(',')
         competitors = [c.strip() for c in competitors if c.strip()]
         
+        # Get models
+        models_input = request.form.get('models', '').split(',')
+        models = [m.strip() for m in models_input if m.strip()]
+        
+        # Get keywords
+        keywords = {}
+        
+        comfort_kw = request.form.get('keywords_comfort', '').split(',')
+        keywords['comfort'] = [k.strip() for k in comfort_kw if k.strip()]
+        
+        quality_kw = request.form.get('keywords_quality', '').split(',')
+        keywords['quality'] = [k.strip() for k in quality_kw if k.strip()]
+        
+        durability_kw = request.form.get('keywords_durability', '').split(',')
+        keywords['durability'] = [k.strip() for k in durability_kw if k.strip()]
+        
+        style_kw = request.form.get('keywords_style', '').split(',')
+        keywords['style'] = [k.strip() for k in style_kw if k.strip()]
+        
+        custom_kw = request.form.get('keywords_custom', '').split(',')
+        if any(custom_kw):
+            keywords['custom'] = [k.strip() for k in custom_kw if k.strip()]
+        
         runs_per_query = int(request.form.get('runs_per_query', 15))
         
+        # Get platform selections
         platforms = {
             'chatgpt': 'chatgpt' in request.form.getlist('platforms'),
             'gemini': 'gemini' in request.form.getlist('platforms'),
             'perplexity': 'perplexity' in request.form.getlist('platforms')
         }
         
+        # Get queries from text area or file
         queries_text = request.form.get('queries_text', '').strip()
         queries_file = request.files.get('queries_file')
         
@@ -112,6 +138,7 @@ def configure():
             with open(filepath, 'r', encoding='utf-8') as f:
                 queries = [line.strip() for line in f.readlines() if line.strip()]
         
+        # Validation
         if not queries:
             flash('Please provide queries either in the text area or upload a file', 'error')
             return redirect(url_for('index'))
@@ -124,35 +151,33 @@ def configure():
             flash('Please select at least one platform', 'error')
             return redirect(url_for('index'))
         
+        # Create config
         config_data = {
             'campaign_name': campaign_name,
             'target_brand': target_brand,
             'competitors': competitors,
             'brand_aliases': {},
-            'models': {},
-            'keywords': {
-                'comfort': ['comfortable', 'comfort', 'cushioned', 'soft', 'padded'],
-                'quality': ['quality', 'durable', 'well-made', 'long-lasting', 'sturdy'],
-                'durability': ['durable', 'last', 'withstand', 'tough', 'resilient'],
-                'style': ['stylish', 'fashionable', 'trendy', 'classic', 'versatile']
-            },
+            'models': models,  # Now includes user input
+            'keywords': keywords,  # Now includes user input
             'queries': queries,
             'runs_per_query': runs_per_query,
             'platforms': platforms,
             'system_prompt': 'Answer as a UK consumer searching online. Keep answers factual and neutral.'
         }
         
+        # Save config to correct location
         config_file = os.path.join(CONFIG_FOLDER, 'config.json')
         with open(config_file, 'w') as f:
             json.dump(config_data, f, indent=2)
         
-        flash(f'Configuration saved! Ready to analyze {len(queries)} queries', 'success')
+        flash(f'Configuration saved! Ready to analyze {len(queries)} queries across {sum(platforms.values())} platforms', 'success')
         return redirect(url_for('run'))
         
     except Exception as e:
         flash(f'Error saving configuration: {str(e)}', 'error')
         return redirect(url_for('index'))
-
+    
+    
 
 @app.route('/run')
 def run():

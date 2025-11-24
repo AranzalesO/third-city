@@ -29,7 +29,57 @@
         <div class="form-group">
             <label for="competitors">Competitors (comma-separated)</label>
             <textarea id="competitors" name="competitors" rows="3" 
-                      placeholder="e.g., Birkenstock, UGG, Crocs">{{ config.competitors }}</textarea>
+                      placeholder="e.g., Birkenstock, UGG, Crocs, Teva, Keen">{{ config.competitors }}</textarea>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Models/Products (Optional)</h3>
+        
+        <div class="form-group">
+            <label for="models">Product Models (comma-separated)</label>
+            <textarea id="models" name="models" rows="3" 
+                      placeholder="e.g., Blaire, Gryphon, Myles, Terry (for Dr Martens sandals)"></textarea>
+            <small>List specific product names/models to track mentions</small>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Key Messages to Track</h3>
+        
+        <div class="form-group">
+            <label for="keywords_comfort">Comfort Keywords (comma-separated)</label>
+            <input type="text" id="keywords_comfort" name="keywords_comfort" 
+                   placeholder="e.g., comfortable, cushioned, soft, padded"
+                   value="comfortable, comfort, cushioned, soft, padded">
+        </div>
+
+        <div class="form-group">
+            <label for="keywords_quality">Quality Keywords (comma-separated)</label>
+            <input type="text" id="keywords_quality" name="keywords_quality" 
+                   placeholder="e.g., quality, durable, well-made"
+                   value="quality, durable, well-made, long-lasting, sturdy">
+        </div>
+
+        <div class="form-group">
+            <label for="keywords_durability">Durability Keywords (comma-separated)</label>
+            <input type="text" id="keywords_durability" name="keywords_durability" 
+                   placeholder="e.g., durable, last, withstand"
+                   value="durable, last, withstand, tough, resilient">
+        </div>
+
+        <div class="form-group">
+            <label for="keywords_style">Style Keywords (comma-separated)</label>
+            <input type="text" id="keywords_style" name="keywords_style" 
+                   placeholder="e.g., stylish, fashionable, trendy"
+                   value="stylish, fashionable, trendy, classic, versatile">
+        </div>
+
+        <div class="form-group">
+            <label for="keywords_custom">Custom Keywords (optional)</label>
+            <input type="text" id="keywords_custom" name="keywords_custom" 
+                   placeholder="e.g., eco-friendly, sustainable, vegan">
+            <small>Add any additional keywords you want to track</small>
         </div>
     </div>
 
@@ -56,7 +106,7 @@
             <label for="runs_per_query">Runs Per Query: <span id="runs_value">{{ config.runs_per_query }}</span></label>
             <input type="range" id="runs_per_query" name="runs_per_query" 
                    min="5" max="100" value="{{ config.runs_per_query }}" step="5">
-            <small>More runs = more reliable data but longer processing time</small>
+            <small>More runs = more reliable data but longer processing time (15 runs ≈ 1.7 hours for 37 queries)</small>
         </div>
 
         <div class="form-group">
