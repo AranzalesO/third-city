@@ -1,4 +1,4 @@
-# src/report_generator.py - CORRECTED VERSION
+# src/report_generator.py
 """
 Report Generator - Creates Excel reports matching client template exactly
 """
@@ -92,32 +92,56 @@ class ReportGenerator:
         # 1. Query
         query = result['query']
         
-        # 2. Query brand with percentage
+        # 2. Query brand - ONLY show TARGET BRAND (not other brands mentioned in query)
         query_brands = result['query_brands']
-        if query_brands:
-            query_brand_str = ", ".join([f"{brand} ({likelihood}%)" 
-                                         for brand, likelihood in query_brands])
-        else:
-            query_brand_str = ""
+        target_brand_lower = self.target_brand.lower()
         
-        # 3-8. Organic competitors
+        # Filter to show only target brand
+        target_brand_stats = None
+        for brand, likelihood in query_brands:
+            if brand.lower() == target_brand_lower:
+                target_brand_stats = (brand, likelihood)
+                break
+        
+        if target_brand_stats:
+            query_brand_str = f"{target_brand_stats[0]} ({target_brand_stats[1]}%)"
+        else:
+            query_brand_str = f"{self.target_brand} (0%)"
+        
+        # 3-8. Organic competitors (excluding target brand)
         organic = result['organic_competitors']
         total_runs = result['total_runs']
         
-        organic_1 = organic[0][0] if len(organic) > 0 else ""
-        organic_1_pct = f"{round((organic[0][1]/total_runs)*100)}%" if len(organic) > 0 else ""
+        # Filter out target brand from organic competitors
+        organic_filtered = [(brand, count) for brand, count in organic 
+                           if brand.lower() != target_brand_lower]
         
-        organic_2 = organic[1][0] if len(organic) > 1 else ""
-        organic_2_pct = f"{round((organic[1][1]/total_runs)*100)}%" if len(organic) > 1 else ""
+        organic_1 = organic_filtered[0][0] if len(organic_filtered) > 0 else ""
+        organic_1_pct = f"{round((organic_filtered[0][1]/total_runs)*100)}%" if len(organic_filtered) > 0 else ""
         
-        organic_3 = organic[2][0] if len(organic) > 2 else ""
-        organic_3_pct = f"{round((organic[2][1]/total_runs)*100)}%" if len(organic) > 2 else ""
+        organic_2 = organic_filtered[1][0] if len(organic_filtered) > 1 else ""
+        organic_2_pct = f"{round((organic_filtered[1][1]/total_runs)*100)}%" if len(organic_filtered) > 1 else ""
+        
+        organic_3 = organic_filtered[2][0] if len(organic_filtered) > 2 else ""
+        organic_3_pct = f"{round((organic_filtered[2][1]/total_runs)*100)}%" if len(organic_filtered) > 2 else ""
         
         # 9. Position
         position = result.get('position', "")
         
-        # 10. Competitors Mentioned (all competitors found)
-        competitors_mentioned = result.get('all_competitors_mentioned', "")
+        # 10. Competitors Mentioned (all competitors found, excluding target brand)
+        all_competitors = []
+        
+        # Add query brands (excluding target)
+        for brand, _ in query_brands:
+            if brand.lower() != target_brand_lower:
+                all_competitors.append(brand)
+        
+        # Add organic competitors (excluding target)
+        for brand, _ in organic:
+            if brand.lower() != target_brand_lower and brand not in all_competitors:
+                all_competitors.append(brand)
+        
+        competitors_mentioned = ", ".join(all_competitors) if all_competitors else ""
         
         # 11. Sources
         sources = result['sources']
@@ -129,10 +153,10 @@ class ReportGenerator:
         
         # 13-16. Key messages - as percentages
         key_messages = result['key_messages']
-        comfort_pct = f"{key_messages.get('comfort', 0)}%"
-        quality_pct = f"{key_messages.get('quality', 0)}%"
-        durability_pct = f"{key_messages.get('durability', 0)}%"
-        style_pct = f"{key_messages.get('style', 0)}%"
+        comfort_pct = f"{round((key_messages.get('comfort', 0) / total_runs) * 100)}%"
+        quality_pct = f"{round((key_messages.get('quality', 0) / total_runs) * 100)}%"
+        durability_pct = f"{round((key_messages.get('durability', 0) / total_runs) * 100)}%"
+        style_pct = f"{round((key_messages.get('style', 0) / total_runs) * 100)}%"
         
         # 17. Tone (P/N/N)
         tone = result.get('tone', "N")
