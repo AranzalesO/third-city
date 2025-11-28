@@ -219,7 +219,7 @@ class BrandAnalyzer:
         detected = {}
         
         for category, keywords in self.keywords.items():
-            detected[category] = any(kw in response_lower for kw in keywords)
+            detected[category] = any(kw.lower() in response_lower for kw in keywords)
         
         return detected
     
@@ -260,7 +260,7 @@ class BrandAnalyzer:
         # Extract brands from text
         explicit_brands = self.extract_brands_from_response(response)
         
-        # Extract brands from domains (NEW!)
+        # Extract brands from domains
         domain_brands = self.extract_brands_from_domains(sources)
         
         # Combine all brand mentions
@@ -318,12 +318,18 @@ class BrandAnalyzer:
         model_counter = Counter(all_models)
         top_models = model_counter.most_common(5)
         
-        # Aggregate key messages
+        # Aggregate key messages - CONVERT TO PERCENTAGES
         key_message_counts = {cat: 0 for cat in self.keywords.keys()}
         for result in results:
             for category, detected in result['key_messages'].items():
                 if detected:
                     key_message_counts[category] += 1
+        
+        # Convert counts to percentages
+        key_message_percentages = {}
+        for category, count in key_message_counts.items():
+            percentage = round((count / total_runs) * 100) if total_runs > 0 else 0
+            key_message_percentages[category] = percentage
         
         return {
             'query': query,
@@ -331,6 +337,6 @@ class BrandAnalyzer:
             'organic_competitors': organic_top,
             'sources': top_sources,
             'models': top_models,
-            'key_messages': key_message_counts,
+            'key_messages': key_message_percentages,  # Returns percentages now
             'total_runs': total_runs
         }

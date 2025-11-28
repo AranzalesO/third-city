@@ -9,87 +9,96 @@
 </div>
 
 <form method="POST" action="{{ url_for('configure') }}" enctype="multipart/form-data" class="config-form">
-    
+
     <div class="form-section">
         <h3>Campaign Details</h3>
-        
+
         <div class="form-group">
             <label for="campaign_name">Campaign Name</label>
-            <input type="text" id="campaign_name" name="campaign_name" 
-                   value="{{ config.campaign_name }}" required>
+            <input type="text" id="campaign_name" name="campaign_name" value="{{ config.campaign_name }}" required>
         </div>
 
         <div class="form-group">
             <label for="target_brand">Target Brand *</label>
-            <input type="text" id="target_brand" name="target_brand" 
-                   value="{{ config.target_brand }}" required 
-                   placeholder="e.g., Dr Martens">
+            <input type="text" id="target_brand" name="target_brand" value="{{ config.target_brand }}" required
+                placeholder="e.g., Dr Martens">
         </div>
 
         <div class="form-group">
             <label for="competitors">Competitors (comma-separated)</label>
-            <textarea id="competitors" name="competitors" rows="3" 
-                      placeholder="e.g., Birkenstock, UGG, Crocs, Teva, Keen">{{ config.competitors }}</textarea>
+            <textarea id="competitors" name="competitors" rows="3"
+                placeholder="e.g., Birkenstock, UGG, Crocs, Teva, Keen">{{ config.competitors }}</textarea>
         </div>
     </div>
 
     <div class="form-section">
         <h3>Models/Products (Optional)</h3>
-        
+
         <div class="form-group">
             <label for="models">Product Models (comma-separated)</label>
-            <textarea id="models" name="models" rows="3" 
-                      placeholder="e.g., Blaire, Gryphon, Myles, Terry (for Dr Martens sandals)"></textarea>
+            <textarea id="models" name="models" rows="3"
+                placeholder="e.g., Blaire, Gryphon, Myles, Terry (for Dr Martens sandals)"></textarea>
             <small>List specific product names/models to track mentions</small>
         </div>
     </div>
 
     <div class="form-section">
         <h3>Key Messages to Track</h3>
-        
+        <p><small>Edit category names below - they will appear in your report columns</small></p>
+
         <div class="form-group">
-            <label for="keywords_comfort">Comfort Keywords (comma-separated)</label>
-            <input type="text" id="keywords_comfort" name="keywords_comfort" 
-                   placeholder="e.g., comfortable, cushioned, soft, padded"
-                   value="comfortable, comfort, cushioned, soft, padded">
+            <label for="category_name_1">Category 1 Name</label>
+            <input type="text" id="category_name_1" name="category_name_1" value="Comfort"
+                placeholder="e.g., Comfort, Sustainability">
+        </div>
+        <div class="form-group">
+            <label for="keywords_1">Category 1 Keywords (comma-separated)</label>
+            <input type="text" id="keywords_1" name="keywords_1"
+                placeholder="e.g., comfortable, cushioned, soft, padded"
+                value="comfortable, comfort, cushioned, soft, padded">
         </div>
 
         <div class="form-group">
-            <label for="keywords_quality">Quality Keywords (comma-separated)</label>
-            <input type="text" id="keywords_quality" name="keywords_quality" 
-                   placeholder="e.g., quality, durable, well-made"
-                   value="quality, durable, well-made, long-lasting, sturdy">
+            <label for="category_name_2">Category 2 Name</label>
+            <input type="text" id="category_name_2" name="category_name_2" value="Quality"
+                placeholder="e.g., Quality, Craftsmanship">
+        </div>
+        <div class="form-group">
+            <label for="keywords_2">Category 2 Keywords (comma-separated)</label>
+            <input type="text" id="keywords_2" name="keywords_2" placeholder="e.g., quality, durable, well-made"
+                value="quality, durable, well-made, long-lasting, sturdy">
         </div>
 
         <div class="form-group">
-            <label for="keywords_durability">Durability Keywords (comma-separated)</label>
-            <input type="text" id="keywords_durability" name="keywords_durability" 
-                   placeholder="e.g., durable, last, withstand"
-                   value="durable, last, withstand, tough, resilient">
+            <label for="category_name_3">Category 3 Name</label>
+            <input type="text" id="category_name_3" name="category_name_3" value="Durability"
+                placeholder="e.g., Durability, Longevity">
+        </div>
+        <div class="form-group">
+            <label for="keywords_3">Category 3 Keywords (comma-separated)</label>
+            <input type="text" id="keywords_3" name="keywords_3" placeholder="e.g., durable, last, withstand"
+                value="durable, last, withstand, tough, resilient">
         </div>
 
         <div class="form-group">
-            <label for="keywords_style">Style Keywords (comma-separated)</label>
-            <input type="text" id="keywords_style" name="keywords_style" 
-                   placeholder="e.g., stylish, fashionable, trendy"
-                   value="stylish, fashionable, trendy, classic, versatile">
+            <label for="category_name_4">Category 4 Name</label>
+            <input type="text" id="category_name_4" name="category_name_4" value="Style"
+                placeholder="e.g., Style, Fashion">
         </div>
-
         <div class="form-group">
-            <label for="keywords_custom">Custom Keywords (optional)</label>
-            <input type="text" id="keywords_custom" name="keywords_custom" 
-                   placeholder="e.g., eco-friendly, sustainable, vegan">
-            <small>Add any additional keywords you want to track</small>
+            <label for="keywords_4">Category 4 Keywords (comma-separated)</label>
+            <input type="text" id="keywords_4" name="keywords_4" placeholder="e.g., stylish, fashionable, trendy"
+                value="stylish, fashionable, trendy, classic, versatile">
         </div>
     </div>
 
     <div class="form-section">
         <h3>Queries</h3>
-        
+
         <div class="form-group">
             <label for="queries_text">Enter Queries (one per line)</label>
-            <textarea id="queries_text" name="queries_text" rows="10" 
-                      placeholder="Are Dr Martens sandals comfortable?&#10;Do Dr Martens sandals need breaking in?&#10;Are Dr Martens sandals true to size?"></textarea>
+            <textarea id="queries_text" name="queries_text" rows="10"
+                placeholder="Are Dr Martens sandals comfortable?&#10;Do Dr Martens sandals need breaking in?&#10;Are Dr Martens sandals true to size?"></textarea>
         </div>
 
         <div class="form-group">
@@ -101,30 +110,31 @@
 
     <div class="form-section">
         <h3>Analysis Settings</h3>
-        
+
         <div class="form-group">
             <label for="runs_per_query">Runs Per Query: <span id="runs_value">{{ config.runs_per_query }}</span></label>
-            <input type="range" id="runs_per_query" name="runs_per_query" 
-                   min="5" max="100" value="{{ config.runs_per_query }}" step="5">
-            <small>More runs = more reliable data but longer processing time (15 runs ≈ 1.7 hours for 37 queries)</small>
+            <input type="range" id="runs_per_query" name="runs_per_query" min="5" max="100"
+                value="{{ config.runs_per_query }}" step="5">
+            <small>More runs = more reliable data but longer processing time (15 runs ≈ 1.7 hours for 37
+                queries)</small>
         </div>
 
         <div class="form-group">
             <label>Platforms *</label>
             <div class="checkbox-group">
                 <label>
-                    <input type="checkbox" name="platforms" value="chatgpt" 
-                           {% if 'chatgpt' in config.platforms %}checked{% endif %}>
+                    <input type="checkbox" name="platforms" value="chatgpt" {% if 'chatgpt' in config.platforms
+                        %}checked{% endif %}>
                     ChatGPT (Fast, ~3s per call)
                 </label>
                 <label>
-                    <input type="checkbox" name="platforms" value="gemini" 
-                           {% if 'gemini' in config.platforms %}checked{% endif %}>
+                    <input type="checkbox" name="platforms" value="gemini" {% if 'gemini' in config.platforms
+                        %}checked{% endif %}>
                     Gemini (Fast, ~4s per call)
                 </label>
                 <label>
-                    <input type="checkbox" name="platforms" value="perplexity" 
-                           {% if 'perplexity' in config.platforms %}checked{% endif %}>
+                    <input type="checkbox" name="platforms" value="perplexity" {% if 'perplexity' in config.platforms
+                        %}checked{% endif %}>
                     Perplexity (Slower, ~9s per call)
                 </label>
             </div>
@@ -137,9 +147,9 @@
 </form>
 
 <script>
-// Update slider value display
-document.getElementById('runs_per_query').addEventListener('input', function() {
-    document.getElementById('runs_value').textContent = this.value;
-});
+    // Update slider value display
+    document.getElementById('runs_per_query').addEventListener('input', function () {
+        document.getElementById('runs_value').textContent = this.value;
+    });
 </script>
 {% endblock %}

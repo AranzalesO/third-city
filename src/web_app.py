@@ -86,32 +86,40 @@ def configure():
     try:
         # Get form data
         campaign_name = request.form.get('campaign_name', 'Brand Campaign')
-        target_brand = request.form.get('target_brand')
+        target_brand = request.form.get('target_brand', '').strip()
         competitors = request.form.get('competitors', '').split(',')
         competitors = [c.strip() for c in competitors if c.strip()]
+        
+        # IMPORTANT: Remove target brand from competitors if present
+        target_brand_lower = target_brand.lower()
+        competitors = [c for c in competitors if c.lower() != target_brand_lower]
         
         # Get models
         models_input = request.form.get('models', '').split(',')
         models = [m.strip() for m in models_input if m.strip()]
         
-        # Get keywords
+        # Get keywords with custom category names
         keywords = {}
         
-        comfort_kw = request.form.get('keywords_comfort', '').split(',')
-        keywords['comfort'] = [k.strip() for k in comfort_kw if k.strip()]
+        cat1_name = request.form.get('category_name_1', 'Comfort').strip() or 'Comfort'
+        cat1_kw = [k.strip() for k in request.form.get('keywords_1', '').split(',') if k.strip()]
+        if cat1_kw:
+            keywords[cat1_name] = cat1_kw
         
-        quality_kw = request.form.get('keywords_quality', '').split(',')
-        keywords['quality'] = [k.strip() for k in quality_kw if k.strip()]
+        cat2_name = request.form.get('category_name_2', 'Quality').strip() or 'Quality'
+        cat2_kw = [k.strip() for k in request.form.get('keywords_2', '').split(',') if k.strip()]
+        if cat2_kw:
+            keywords[cat2_name] = cat2_kw
         
-        durability_kw = request.form.get('keywords_durability', '').split(',')
-        keywords['durability'] = [k.strip() for k in durability_kw if k.strip()]
+        cat3_name = request.form.get('category_name_3', 'Durability').strip() or 'Durability'
+        cat3_kw = [k.strip() for k in request.form.get('keywords_3', '').split(',') if k.strip()]
+        if cat3_kw:
+            keywords[cat3_name] = cat3_kw
         
-        style_kw = request.form.get('keywords_style', '').split(',')
-        keywords['style'] = [k.strip() for k in style_kw if k.strip()]
-        
-        custom_kw = request.form.get('keywords_custom', '').split(',')
-        if any(custom_kw):
-            keywords['custom'] = [k.strip() for k in custom_kw if k.strip()]
+        cat4_name = request.form.get('category_name_4', 'Style').strip() or 'Style'
+        cat4_kw = [k.strip() for k in request.form.get('keywords_4', '').split(',') if k.strip()]
+        if cat4_kw:
+            keywords[cat4_name] = cat4_kw
         
         runs_per_query = int(request.form.get('runs_per_query', 15))
         
@@ -157,8 +165,8 @@ def configure():
             'target_brand': target_brand,
             'competitors': competitors,
             'brand_aliases': {},
-            'models': models,  # Now includes user input
-            'keywords': keywords,  # Now includes user input
+            'models': models,
+            'keywords': keywords,  # Now with custom category names
             'queries': queries,
             'runs_per_query': runs_per_query,
             'platforms': platforms,
@@ -175,8 +183,7 @@ def configure():
         
     except Exception as e:
         flash(f'Error saving configuration: {str(e)}', 'error')
-        return redirect(url_for('index'))
-    
+        return redirect(url_for('index'))    
     
 
 @app.route('/run')

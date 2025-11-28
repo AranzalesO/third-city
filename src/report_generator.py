@@ -51,7 +51,10 @@ class ReportGenerator:
         """Create sheet for a specific platform matching client template"""
         ws = wb.create_sheet(platform_name)
         
-        # Headers - matching client template EXACTLY
+        # Get custom keyword category names from config
+        keyword_categories = list(self.config.get_keywords().keys())
+        
+        # Build headers dynamically with custom category names
         headers = [
             "Query",
             "Query brand (they want to audit)",
@@ -65,14 +68,18 @@ class ReportGenerator:
             "Competitors Mentioned",
             "Source(s) Cited",
             "Recency of primary source",
-            "Inclusion of key messages - Comfort",
-            "Inclusion of key messages - Quality",
-            "Inclusion of key messages - Durability",
-            "Inclusion of key messages - Style",
+        ]
+        
+        # Add custom keyword category headers
+        for category_name in keyword_categories:
+            headers.append(f"Inclusion of key messages - {category_name}")
+        
+        # Add remaining headers
+        headers.extend([
             "Tone (P/N/N)",
             "Style mentioned",
             "Time and date of query run"
-        ]
+        ])
         
         ws.append(headers)
         
@@ -81,22 +88,21 @@ class ReportGenerator:
         
         # Add data rows
         for result in results:
-            row_data = self._format_platform_row(result)
+            row_data = self._format_platform_row(result, keyword_categories)
             ws.append(row_data)
         
         # Format columns
-        self._format_columns(ws)
+        self._format_columns(ws, len(keyword_categories))
     
-    def _format_platform_row(self, result: Dict[str, Any]) -> List[Any]:
+    def _format_platform_row(self, result: Dict[str, Any], keyword_categories: List[str]) -> List[Any]:
         """Format result into row matching client template"""
         # 1. Query
         query = result['query']
         
-        # 2. Query brand - ONLY show TARGET BRAND (not other brands mentioned in query)
+        # 2. Query brand - ONLY show TARGET BRAND
         query_brands = result['query_brands']
         target_brand_lower = self.target_brand.lower()
         
-        # Filter to show only target brand
         target_brand_stats = None
         for brand, likelihood in query_brands:
             if brand.lower() == target_brand_lower:
@@ -108,11 +114,10 @@ class ReportGenerator:
         else:
             query_brand_str = f"{self.target_brand} (0%)"
         
-        # 3-8. Organic competitors (excluding target brand)
+        # 3-8. Organic competitors
         organic = result['organic_competitors']
         total_runs = result['total_runs']
         
-        # Filter out target brand from organic competitors
         organic_filtered = [(brand, count) for brand, count in organic 
                            if brand.lower() != target_brand_lower]
         
@@ -128,19 +133,14 @@ class ReportGenerator:
         # 9. Position
         position = result.get('position', "")
         
-        # 10. Competitors Mentioned (all competitors found, excluding target brand)
+        # 10. Competitors Mentioned
         all_competitors = []
-        
-        # Add query brands (excluding target)
         for brand, _ in query_brands:
             if brand.lower() != target_brand_lower:
                 all_competitors.append(brand)
-        
-        # Add organic competitors (excluding target)
         for brand, _ in organic:
             if brand.lower() != target_brand_lower and brand not in all_competitors:
                 all_competitors.append(brand)
-        
         competitors_mentioned = ", ".join(all_competitors) if all_competitors else ""
         
         # 11. Sources
@@ -148,28 +148,28 @@ class ReportGenerator:
         sources_str = "; ".join([f"{domain} ({count}x)" for domain, count in sources[:5]]) \
                      if sources else ""
         
-        # 12. Recency of primary source
+        # 12. Recency
         recency = result.get('source_recency', "")
         
-        # 13-16. Key messages - already as percentages
+        # 13-N. Key messages - USE ACTUAL CATEGORY NAMES (case-sensitive)
         key_messages = result['key_messages']
-        comfort_pct = f"{key_messages.get('comfort', 0)}%"
-        quality_pct = f"{key_messages.get('quality', 0)}%"
-        durability_pct = f"{key_messages.get('durability', 0)}%"
-        style_pct = f"{key_messages.get('style', 0)}%"
+        keyword_percentages = []
+        for category_name in keyword_categories:
+            pct = key_messages.get(category_name, 0)  # Already a percentage from analyzer
+            keyword_percentages.append(f"{pct}%")
         
-        # 17. Tone (P/N/N)
+        # N+1. Tone
         tone = result.get('tone', "N")
         
-        # 18. Style mentioned (models/sandal styles)
+        # N+2. Models
         models = result['models']
-        models_str = ", ".join([model for model, count in models[:10]]) \
-                    if models else ""
+        models_str = ", ".join([model for model, count in models[:10]]) if models else ""
         
-        # 19. Time and date of query run
+        # N+3. Timestamp
         timestamp = result.get('timestamp', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         
-        return [
+        # Build row
+        row = [
             query,
             query_brand_str,
             organic_1, organic_1_pct,
@@ -179,14 +179,15 @@ class ReportGenerator:
             competitors_mentioned,
             sources_str,
             recency,
-            comfort_pct,
-            quality_pct,
-            durability_pct,
-            style_pct,
-            tone,
-            models_str,
-            timestamp
         ]
+        
+        # Add keyword percentages dynamically
+        row.extend(keyword_percentages)
+        
+        # Add remaining fields
+        row.extend([tone, models_str, timestamp])
+        
+        return row
     
     def _create_campaign_info_sheet(self, wb: Workbook):
         """Create campaign info sheet"""
@@ -229,9 +230,9 @@ class ReportGenerator:
             cell.font = header_font
             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
     
-    def _format_columns(self, ws):
+    def _format_columns(self, ws, num_keyword_categories: int):
         """Format column widths"""
-        column_widths = {
+        base_columns = {
             'A': 50,  # Query
             'B': 25,  # Query brand
             'C': 20,  # Organic 1
@@ -244,17 +245,25 @@ class ReportGenerator:
             'J': 30,  # Competitors Mentioned
             'K': 45,  # Sources
             'L': 20,  # Recency
-            'M': 12,  # Comfort %
-            'N': 12,  # Quality %
-            'O': 12,  # Durability %
-            'P': 12,  # Style %
-            'Q': 8,   # Tone
-            'R': 40,  # Styles mentioned
-            'S': 20,  # Timestamp
         }
         
-        for col, width in column_widths.items():
+        for col, width in base_columns.items():
             ws.column_dimensions[col].width = width
+        
+        # Keyword columns (M, N, O, P, etc.) - dynamic based on number of categories
+        keyword_start_col = 13  # Column M (13th column, 0-indexed would be 12)
+        for i in range(num_keyword_categories):
+            col_letter = chr(ord('M') + i)
+            ws.column_dimensions[col_letter].width = 15
+        
+        # Remaining columns after keywords
+        tone_col = chr(ord('M') + num_keyword_categories)
+        models_col = chr(ord('M') + num_keyword_categories + 1)
+        timestamp_col = chr(ord('M') + num_keyword_categories + 2)
+        
+        ws.column_dimensions[tone_col].width = 8
+        ws.column_dimensions[models_col].width = 40
+        ws.column_dimensions[timestamp_col].width = 20
         
         # Cell alignment
         for row in ws.iter_rows(min_row=2):
