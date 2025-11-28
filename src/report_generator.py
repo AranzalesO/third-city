@@ -151,12 +151,12 @@ class ReportGenerator:
         # 12. Recency of primary source
         recency = result.get('source_recency', "")
         
-        # 13-16. Key messages - as percentages
+        # 13-16. Key messages - already as percentages
         key_messages = result['key_messages']
-        comfort_pct = f"{round((key_messages.get('comfort', 0) / total_runs) * 100)}%"
-        quality_pct = f"{round((key_messages.get('quality', 0) / total_runs) * 100)}%"
-        durability_pct = f"{round((key_messages.get('durability', 0) / total_runs) * 100)}%"
-        style_pct = f"{round((key_messages.get('style', 0) / total_runs) * 100)}%"
+        comfort_pct = f"{key_messages.get('comfort', 0)}%"
+        quality_pct = f"{key_messages.get('quality', 0)}%"
+        durability_pct = f"{key_messages.get('durability', 0)}%"
+        style_pct = f"{key_messages.get('style', 0)}%"
         
         # 17. Tone (P/N/N)
         tone = result.get('tone', "N")
