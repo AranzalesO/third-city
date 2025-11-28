@@ -1,4 +1,3 @@
-
 """
 Brand Analyzer - Core analysis engine
 """
@@ -58,6 +57,34 @@ class BrandAnalyzer:
             
             if brand_found:
                 found_brands.append(brand)
+        
+        return found_brands
+    
+    def extract_brands_from_domains(self, domains: List[str]) -> List[str]:
+        """Extract brand names from domain URLs"""
+        found_brands = []
+        
+        for domain in domains:
+            domain_lower = domain.lower()
+            
+            # Check each brand against the domain
+            for brand in self.all_brands:
+                brand_lower = brand.lower().replace(' ', '').replace('-', '')
+                
+                # Check if brand name is in domain (e.g., gridserve in gridserve.com)
+                if brand_lower in domain_lower.replace('.', '').replace('-', ''):
+                    if brand not in found_brands:
+                        found_brands.append(brand)
+                    continue
+                
+                # Check aliases
+                aliases = self.brand_aliases.get(brand, [])
+                for alias in aliases:
+                    alias_clean = alias.lower().replace(' ', '').replace('-', '')
+                    if alias_clean in domain_lower.replace('.', '').replace('-', ''):
+                        if brand not in found_brands:
+                            found_brands.append(brand)
+                        break
         
         return found_brands
     
@@ -227,13 +254,20 @@ class BrandAnalyzer:
     def analyze_single_response(self, query: str, response: str, 
                                query_brands: List[str]) -> Dict[str, Any]:
         """Analyze a single response"""
-        # Extract brands
+        # Extract sources first
+        sources = self.extract_sources(response)
+        
+        # Extract brands from text
         explicit_brands = self.extract_brands_from_response(response)
+        
+        # Extract brands from domains (NEW!)
+        domain_brands = self.extract_brands_from_domains(sources)
+        
+        # Combine all brand mentions
         implicit_brands = self.detect_implicit_brand_reference(query, response, query_brands)
-        all_brands = list(set(explicit_brands + implicit_brands))
+        all_brands = list(set(explicit_brands + implicit_brands + domain_brands))
         
         # Extract other data
-        sources = self.extract_sources(response)
         models = self.extract_models(response)
         key_messages = self.detect_key_messages(response)
         sentiment = self.detect_sentiment(response)
