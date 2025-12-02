@@ -99,25 +99,34 @@ class ReportGenerator:
         # 1. Query
         query = result['query']
         
-        # 2. Query brand - ONLY show TARGET BRAND
+        # 2. Query brand - show TARGET BRAND from EITHER query_brands OR organic_competitors
         query_brands = result['query_brands']
+        organic = result['organic_competitors']
+        total_runs = result['total_runs']
         target_brand_lower = self.target_brand.lower()
         
+        # First check query_brands (brands mentioned in the query)
         target_brand_stats = None
         for brand, likelihood in query_brands:
             if brand.lower() == target_brand_lower:
                 target_brand_stats = (brand, likelihood)
                 break
         
+        # If not in query_brands, check organic_competitors (brands found in responses)
+        if not target_brand_stats:
+            for brand, count in organic:
+                if brand.lower() == target_brand_lower:
+                    likelihood = round((count / total_runs) * 100)
+                    target_brand_stats = (brand, likelihood)
+                    break
+        
+        # Format the target brand string
         if target_brand_stats:
             query_brand_str = f"{target_brand_stats[0]} ({target_brand_stats[1]}%)"
         else:
             query_brand_str = f"{self.target_brand} (0%)"
         
-        # 3-8. Organic competitors
-        organic = result['organic_competitors']
-        total_runs = result['total_runs']
-        
+        # 3-8. Organic competitors (excluding target brand)
         organic_filtered = [(brand, count) for brand, count in organic 
                            if brand.lower() != target_brand_lower]
         
@@ -155,7 +164,7 @@ class ReportGenerator:
         key_messages = result['key_messages']
         keyword_percentages = []
         for category_name in keyword_categories:
-            pct = key_messages.get(category_name, 0)  # Already a percentage from analyzer
+            pct = key_messages.get(category_name, 0)
             keyword_percentages.append(f"{pct}%")
         
         # N+1. Tone
@@ -251,7 +260,7 @@ class ReportGenerator:
             ws.column_dimensions[col].width = width
         
         # Keyword columns (M, N, O, P, etc.) - dynamic based on number of categories
-        keyword_start_col = 13  # Column M (13th column, 0-indexed would be 12)
+        keyword_start_col = 13  # Column M
         for i in range(num_keyword_categories):
             col_letter = chr(ord('M') + i)
             ws.column_dimensions[col_letter].width = 15

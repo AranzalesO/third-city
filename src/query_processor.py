@@ -182,10 +182,26 @@ class QueryProcessor:
             likelihood = round((count / total_runs) * 100) if total_runs > 0 else 0
             query_brand_stats.append((qb, likelihood))
         
-        # Organic competitors
-        organic_competitors = {brand: count for brand, count in brand_counter.items()
-                              if brand not in query_brands}
-        organic_top = Counter(organic_competitors).most_common(3)
+        # Organic competitors - TOP 3, but ALWAYS include target brand if present
+        target_brand = self.config.get_target_brand()
+        organic_competitors_dict = {brand: count for brand, count in brand_counter.items()
+                                   if brand not in query_brands}
+        
+        # Get top 3
+        organic_top = Counter(organic_competitors_dict).most_common(3)
+        
+        # CRITICAL FIX: If target brand exists but not in top 3, add it
+        target_brand_in_organic = None
+        for brand, count in organic_competitors_dict.items():
+            if brand.lower() == target_brand.lower():
+                target_brand_in_organic = (brand, count)
+                break
+        
+        # If target brand exists but not in top 3, append it
+        if target_brand_in_organic and target_brand_in_organic not in organic_top:
+            organic_top_with_target = list(organic_top) + [target_brand_in_organic]
+        else:
+            organic_top_with_target = list(organic_top)
         
         # All competitors mentioned (comma-separated)
         all_competitors = [brand for brand, count in brand_counter.most_common(10) 
@@ -222,10 +238,10 @@ class QueryProcessor:
         # Timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        return {
+        aggregated_result = {
             'query': query,
             'query_brands': query_brand_stats,
-            'organic_competitors': organic_top,
+            'organic_competitors': organic_top_with_target,  # NOW includes target brand!
             'all_competitors_mentioned': all_competitors_str,
             'position': position_str,
             'sources': top_sources,
@@ -236,6 +252,17 @@ class QueryProcessor:
             'timestamp': timestamp,
             'total_runs': total_runs
         }
+        
+        # DEBUG: Print aggregated results
+        print(f"\n=== AGGREGATED RESULTS ===")
+        print(f"Query: {query[:60]}...")
+        print(f"Target brand (from config): {target_brand}")
+        print(f"query_brands: {aggregated_result['query_brands']}")
+        print(f"organic_competitors (with target): {aggregated_result['organic_competitors']}")
+        print(f"brand_counter (all brands): {dict(brand_counter.most_common(5))}")
+        print(f"=========================\n")
+        
+        return aggregated_result
     
     def _detect_source_recency(self, sources: List[tuple]) -> str:
         """Detect recency from source URLs"""

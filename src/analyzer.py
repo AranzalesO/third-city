@@ -263,6 +263,14 @@ class BrandAnalyzer:
         # Extract brands from domains
         domain_brands = self.extract_brands_from_domains(sources)
         
+        # DEBUG
+        print(f"\n=== ANALYSIS DEBUG ===")
+        print(f"Query: {query[:60]}...")
+        print(f"Sources found: {sources}")
+        print(f"Domain brands: {domain_brands}")
+        print(f"Explicit brands: {explicit_brands}")
+        print(f"===================\n")
+
         # Combine all brand mentions
         implicit_brands = self.detect_implicit_brand_reference(query, response, query_brands)
         all_brands = list(set(explicit_brands + implicit_brands + domain_brands))
