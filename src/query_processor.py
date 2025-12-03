@@ -146,6 +146,9 @@ class QueryProcessor:
         brand_positions = []
         sentiment_scores = []
         
+        # Get target brand for position tracking
+        target_brand = self.config.get_target_brand()
+        
         for result in results:
             if not result['success']:
                 continue
@@ -161,12 +164,12 @@ class QueryProcessor:
                 if detected:
                     key_messages_count[category] += 1
             
-            # Track position
-            if query_brands:
-                query_brand = query_brands[0]
-                if query_brand in result['brands']:
-                    position = result['brands'].index(query_brand) + 1
+            # Track position - ALWAYS track TARGET BRAND position
+            for brand in result['brands']:
+                if brand.lower() == target_brand.lower():
+                    position = result['brands'].index(brand) + 1
                     brand_positions.append(position)
+                    break
             
             # Track sentiment
             if 'sentiment' in result:
@@ -183,7 +186,6 @@ class QueryProcessor:
             query_brand_stats.append((qb, likelihood))
         
         # Organic competitors - TOP 3, but ALWAYS include target brand if present
-        target_brand = self.config.get_target_brand()
         organic_competitors_dict = {brand: count for brand, count in brand_counter.items()
                                    if brand not in query_brands}
         
@@ -208,7 +210,7 @@ class QueryProcessor:
                           if brand not in query_brands]
         all_competitors_str = ", ".join(all_competitors) if all_competitors else ""
         
-        # Position
+        # Position - based on target brand appearances
         position_str = ""
         if brand_positions:
             most_common_position = Counter(brand_positions).most_common(1)[0][0]
@@ -238,10 +240,10 @@ class QueryProcessor:
         # Timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        aggregated_result = {
+        return {
             'query': query,
             'query_brands': query_brand_stats,
-            'organic_competitors': organic_top_with_target,  # NOW includes target brand!
+            'organic_competitors': organic_top_with_target,
             'all_competitors_mentioned': all_competitors_str,
             'position': position_str,
             'sources': top_sources,
@@ -252,17 +254,6 @@ class QueryProcessor:
             'timestamp': timestamp,
             'total_runs': total_runs
         }
-        
-        # DEBUG: Print aggregated results
-        print(f"\n=== AGGREGATED RESULTS ===")
-        print(f"Query: {query[:60]}...")
-        print(f"Target brand (from config): {target_brand}")
-        print(f"query_brands: {aggregated_result['query_brands']}")
-        print(f"organic_competitors (with target): {aggregated_result['organic_competitors']}")
-        print(f"brand_counter (all brands): {dict(brand_counter.most_common(5))}")
-        print(f"=========================\n")
-        
-        return aggregated_result
     
     def _detect_source_recency(self, sources: List[tuple]) -> str:
         """Detect recency from source URLs"""

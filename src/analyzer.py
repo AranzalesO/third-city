@@ -36,27 +36,34 @@ class BrandAnalyzer:
         return mentioned_brands
     
     def extract_brands_from_response(self, response: str) -> List[str]:
-        """Extract mentioned brands from response text"""
-        found_brands = []
-        response_lower = response.lower()
+        """Extract mentioned brands from response text - PRESERVING ORDER"""
+        brand_positions = []
         
         for brand in self.all_brands:
-            brand_found = False
-            
-            # Check exact brand name
-            if brand.lower() in response_lower:
-                brand_found = True
+            # Find first occurrence of brand name
+            pos = response.lower().find(brand.lower())
+            if pos != -1:
+                brand_positions.append((pos, brand))
+                continue
             
             # Check aliases
-            if not brand_found:
-                aliases = self.brand_aliases.get(brand, [])
-                for alias in aliases:
-                    if alias in response_lower:
-                        brand_found = True
-                        break
-            
-            if brand_found:
+            aliases = self.brand_aliases.get(brand, [])
+            for alias in aliases:
+                pos = response.lower().find(alias.lower())
+                if pos != -1:
+                    brand_positions.append((pos, brand))
+                    break
+        
+        # Sort by position (earliest first) and remove duplicates
+        brand_positions.sort(key=lambda x: x[0])
+        
+        # Build ordered list without duplicates
+        found_brands = []
+        seen = set()
+        for _, brand in brand_positions:
+            if brand not in seen:
                 found_brands.append(brand)
+                seen.add(brand)
         
         return found_brands
     
@@ -257,23 +264,23 @@ class BrandAnalyzer:
         # Extract sources first
         sources = self.extract_sources(response)
         
-        # Extract brands from text
+        # Extract brands from text IN ORDER
         explicit_brands = self.extract_brands_from_response(response)
         
         # Extract brands from domains
         domain_brands = self.extract_brands_from_domains(sources)
         
-        # DEBUG
-        print(f"\n=== ANALYSIS DEBUG ===")
-        print(f"Query: {query[:60]}...")
-        print(f"Sources found: {sources}")
-        print(f"Domain brands: {domain_brands}")
-        print(f"Explicit brands: {explicit_brands}")
-        print(f"===================\n")
-
-        # Combine all brand mentions
+        # Combine - explicit brands FIRST (they preserve order), then add domain brands
+        all_brands = explicit_brands.copy()
+        for brand in domain_brands:
+            if brand not in all_brands:
+                all_brands.append(brand)
+        
+        # Detect implicit brand references
         implicit_brands = self.detect_implicit_brand_reference(query, response, query_brands)
-        all_brands = list(set(explicit_brands + implicit_brands + domain_brands))
+        for brand in implicit_brands:
+            if brand not in all_brands:
+                all_brands.append(brand)
         
         # Extract other data
         models = self.extract_models(response)
@@ -281,7 +288,7 @@ class BrandAnalyzer:
         sentiment = self.detect_sentiment(response)
         
         return {
-            'brands': all_brands,
+            'brands': all_brands,  # NOW IN ORDER!
             'sources': sources,
             'models': models,
             'key_messages': key_messages,
