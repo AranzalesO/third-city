@@ -15,12 +15,12 @@
 
         <div class="form-group">
             <label for="campaign_name">Campaign Name</label>
-            <input type="text" id="campaign_name" name="campaign_name" value="" required>
+            <input type="text" id="campaign_name" name="campaign_name" value="{{ config.campaign_name }}" required>
         </div>
 
         <div class="form-group">
             <label for="target_brand">Target Brand *</label>
-            <input type="text" id="target_brand" name="target_brand" value="" required
+            <input type="text" id="target_brand" name="target_brand" value="{{ config.target_brand }}" required
                 placeholder="e.g., Dr Martens">
         </div>
 

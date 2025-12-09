@@ -39,3 +39,6 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# Context documentation (local only, not tracked)
+Contexts/
