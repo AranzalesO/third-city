@@ -9,19 +9,35 @@ import re
 class ModelNormalizer:
     """Normalizes product model and style names for any brand"""
 
-    def __init__(self, brand_models: Dict[str, List[str]] = None):
+    def __init__(self, brand_models=None):
         """
         Initialize ModelNormalizer with brand-specific models
 
         Args:
-            brand_models: Dictionary mapping brand names to lists of their models
-                         e.g., {"Dr Martens": ["Blaire", "Gryphon", "1460"], ...}
+            brand_models: Either:
+                         - Dictionary mapping brand names to lists of their models
+                           e.g., {"Dr Martens": ["Blaire", "Gryphon", "1460"], ...}
+                         - List of models (legacy format, will use "default" as brand)
+                         - None (will use empty dict)
         """
-        self.brand_models = brand_models or {}
+        # Handle different input formats
+        if brand_models is None:
+            self.brand_models = {}
+        elif isinstance(brand_models, dict):
+            self.brand_models = brand_models
+        elif isinstance(brand_models, list):
+            # Legacy format: convert list to dict with "default" brand
+            self.brand_models = {"default": brand_models}
+        else:
+            self.brand_models = {}
 
         # Build variations for each model (add common suffixes)
         self.model_variations = {}
         for brand, models in self.brand_models.items():
+            # Ensure models is a list
+            if not isinstance(models, list):
+                continue
+
             for model in models:
                 # Create variations with common product suffixes
                 base_model = model.lower().strip()
