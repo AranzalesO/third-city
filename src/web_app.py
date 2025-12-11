@@ -229,11 +229,17 @@ def run_analysis_background():
             os.remove(checkpoint_file)
             analysis_state['logs'].append("Cleared old checkpoint - starting fresh analysis")
 
-        config = ConfigManager()
+        # Force reload config from file (don't use cached instance)
+        config_file = os.path.join(CONFIG_FOLDER, 'config.json')
+        config = ConfigManager(config_file)
         queries = config.get_queries()
 
         analysis_state['total_queries'] = len(queries)
         analysis_state['logs'].append(f"Starting analysis of {len(queries)} queries...")
+
+        # Log each query for debugging
+        for i, q in enumerate(queries, 1):
+            analysis_state['logs'].append(f"  Query {i}: {q}")
 
         processor = QueryProcessor(config)
         platform_results = processor.process_all_queries(queries)
