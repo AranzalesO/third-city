@@ -221,25 +221,31 @@ def start_analysis():
 def run_analysis_background():
     """Run the analysis in background"""
     global analysis_state
-    
+
     try:
+        # Clear any existing checkpoint to ensure fresh analysis
+        checkpoint_file = os.path.join(OUTPUT_FOLDER, 'checkpoint.json')
+        if os.path.exists(checkpoint_file):
+            os.remove(checkpoint_file)
+            analysis_state['logs'].append("Cleared old checkpoint - starting fresh analysis")
+
         config = ConfigManager()
         queries = config.get_queries()
-        
+
         analysis_state['total_queries'] = len(queries)
         analysis_state['logs'].append(f"Starting analysis of {len(queries)} queries...")
-        
+
         processor = QueryProcessor(config)
         platform_results = processor.process_all_queries(queries)
-        
+
         analysis_state['logs'].append("Generating Excel report...")
         report_gen = ReportGenerator(config)
         report_file = report_gen.create_report(platform_results)
-        
+
         analysis_state['report_file'] = report_file
         analysis_state['logs'].append(f"✅ Complete! Report: {report_file}")
         analysis_state['running'] = False
-        
+
     except Exception as e:
         analysis_state['error'] = str(e)
         analysis_state['logs'].append(f"❌ Error: {str(e)}")
