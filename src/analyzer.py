@@ -231,32 +231,32 @@ class BrandAnalyzer:
         return detected
     
     def detect_sentiment(self, response: str) -> str:
-        """Detect sentiment/tone: P (Positive), N (Negative), N (Neutral)"""
+        """Detect sentiment/tone: POS (Positive), NEG (Negative), NEU (Neutral)"""
         response_lower = response.lower()
-        
+
         # Positive indicators
         positive_words = [
             "excellent", "great", "good", "best", "high quality", "comfortable",
             "reliable", "recommended", "love", "perfect", "amazing", "fantastic",
             "outstanding", "superior", "impressive"
         ]
-        
+
         # Negative indicators
         negative_words = [
             "poor", "bad", "worst", "uncomfortable", "unreliable", "avoid",
             "disappointed", "terrible", "awful", "waste", "regret", "inferior",
             "subpar", "lacking"
         ]
-        
+
         positive_count = sum(1 for word in positive_words if word in response_lower)
         negative_count = sum(1 for word in negative_words if word in response_lower)
-        
+
         if positive_count > negative_count and positive_count > 0:
-            return "P"
+            return "POS"
         elif negative_count > positive_count and negative_count > 0:
-            return "N"
+            return "NEG"
         else:
-            return "N"  # Neutral
+            return "NEU"  # Neutral
     
     def analyze_single_response(self, query: str, response: str, 
                                query_brands: List[str]) -> Dict[str, Any]:

@@ -24,7 +24,9 @@ class QueryProcessor:
     def __init__(self, config_manager: ConfigManager):
         self.config = config_manager
         self.analyzer = BrandAnalyzer(config_manager)
-        self.model_normalizer = ModelNormalizer()
+        # Initialize ModelNormalizer with brand-specific models from config
+        brand_models = config_manager.get_models()
+        self.model_normalizer = ModelNormalizer(brand_models)
         self.clients = self._initialize_clients()
         self.system_prompt = config_manager.get_system_prompt()
     
@@ -89,7 +91,7 @@ class QueryProcessor:
                 'sources': [],
                 'models': [],
                 'key_messages': {},
-                'sentiment': 'N',
+                'sentiment': 'NEU',
                 'platform': platform,
                 'success': False,
                 'error': error_msg
@@ -276,10 +278,10 @@ class QueryProcessor:
     def _determine_tone(self, sentiment_scores: List[str]) -> str:
         """Determine overall tone from sentiment scores"""
         if not sentiment_scores:
-            return "N"  # Neutral
-        
+            return "NEU"  # Neutral
+
         most_common = Counter(sentiment_scores).most_common(1)[0][0]
-        return most_common  # "P", "N", or "N"
+        return most_common  # "POS", "NEG", or "NEU"
     
     def _save_checkpoint(self, checkpoint_file: str, platform_results: Dict, 
                         last_completed: int):

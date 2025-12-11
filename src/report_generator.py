@@ -76,7 +76,7 @@ class ReportGenerator:
         
         # Add remaining headers
         headers.extend([
-            "Tone (P/N/N)",
+            "Tone (POS/NEG/NEU)",
             "Style mentioned",
             "Time and date of query run"
         ])
