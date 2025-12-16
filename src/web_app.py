@@ -244,9 +244,20 @@ def run_analysis_background():
         processor = QueryProcessor(config)
         platform_results = processor.process_all_queries(queries)
 
+        # Log summary of results to verify fresh data
+        total_results = sum(len(results) for results in platform_results.values())
+        analysis_state['logs'].append(f"Processed {total_results} total results across {len(platform_results)} platforms")
+
         analysis_state['logs'].append("Generating Excel report...")
         report_gen = ReportGenerator(config)
-        report_file = report_gen.create_report(platform_results)
+        report_file = report_gen.create_report(platform_results, OUTPUT_FOLDER)
+
+        # Verify the file was actually created
+        if os.path.exists(report_file):
+            file_size = os.path.getsize(report_file) / 1024  # KB
+            analysis_state['logs'].append(f"Report created: {os.path.basename(report_file)} ({file_size:.1f} KB)")
+        else:
+            analysis_state['logs'].append(f"⚠️ Warning: Report file not found at {report_file}")
 
         analysis_state['report_file'] = report_file
         analysis_state['logs'].append(f"✅ Complete! Report: {report_file}")
