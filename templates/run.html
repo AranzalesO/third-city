@@ -54,6 +54,12 @@
 let statusInterval = null;
 
 function startAnalysis() {
+    // CRITICAL: Stop any existing polling interval
+    if (statusInterval) {
+        clearInterval(statusInterval);
+        statusInterval = null;
+    }
+
     // Clear any old state from previous run
     document.getElementById('logs').innerHTML = '';
     document.getElementById('download-link').href = '#';
@@ -61,7 +67,7 @@ function startAnalysis() {
     document.getElementById('progress-bar').style.width = '0%';
     document.getElementById('progress').textContent = '0 / 0';
 
-    fetch('/start_analysis', { method: 'POST' })
+    fetch('/start_analysis', { method: 'POST', cache: 'no-store' })
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -92,9 +98,11 @@ function stopAnalysis() {
 
 function updateStatus() {
     // Add timestamp to prevent caching
-    fetch('/status?_=' + new Date().getTime())
+    fetch('/status?_=' + new Date().getTime(), { cache: 'no-store' })
         .then(response => response.json())
         .then(data => {
+            console.log('Status update:', data);  // Debug logging
+
             // Update progress
             const progress = data.total_queries > 0
                 ? Math.round((data.current_query / data.total_queries) * 100)
@@ -117,20 +125,27 @@ function updateStatus() {
             // Check if complete
             if (!data.running && data.report_file) {
                 clearInterval(statusInterval);
+                statusInterval = null;  // Clear the reference
+
                 document.getElementById('status').textContent = 'Complete!';
                 document.getElementById('start-btn').style.display = 'inline-block';
                 document.getElementById('stop-btn').style.display = 'none';
 
+                // Extract filename from path (handle both / and \)
+                const filename = data.report_file.replace(/\\/g, '/').split('/').pop();
+                console.log('Full report path:', data.report_file);
+                console.log('Extracted filename:', filename);
+                console.log('Setting download link to:', '/download/' + filename);
+
                 // Show complete panel with fresh download link
                 document.getElementById('complete-panel').style.display = 'block';
-                const filename = data.report_file.split('/').pop().split('\\').pop();
                 document.getElementById('download-link').href = '/download/' + filename;
-                console.log('Download link set to:', '/download/' + filename);
             }
 
             // Check for errors
             if (data.error) {
                 clearInterval(statusInterval);
+                statusInterval = null;
                 document.getElementById('status').textContent = 'Error!';
                 alert('Error: ' + data.error);
             }
@@ -140,17 +155,38 @@ function updateStatus() {
         });
 }
 
-// Clear old state when page loads
+// Clear old state when page loads and check for fresh state from server
 window.addEventListener('DOMContentLoaded', function() {
-    // If there's old state showing, clear it
-    const currentStatus = document.getElementById('status').textContent;
-    if (currentStatus === 'Complete!' || currentStatus === 'Running...') {
-        document.getElementById('status').textContent = 'Ready';
-        document.getElementById('complete-panel').style.display = 'none';
-        document.getElementById('logs').innerHTML = '';
-        document.getElementById('progress').textContent = '0 / 0';
-        document.getElementById('progress-bar').style.width = '0%';
-    }
+    console.log('Page loaded - checking for stale state');
+
+    // Always fetch fresh state from server
+    fetch('/status?_=' + new Date().getTime(), { cache: 'no-store' })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Initial state from server:', data);
+
+            // If server says not running, ensure UI reflects that
+            if (!data.running) {
+                document.getElementById('status').textContent = 'Ready';
+                document.getElementById('start-btn').style.display = 'inline-block';
+                document.getElementById('stop-btn').style.display = 'none';
+
+                // Only show complete panel if there's actually a report file
+                if (data.report_file) {
+                    console.log('Found existing report:', data.report_file);
+                    // Don't show it - let user start fresh
+                }
+
+                // Clear UI for fresh start
+                document.getElementById('complete-panel').style.display = 'none';
+                document.getElementById('logs').innerHTML = '';
+                document.getElementById('progress').textContent = '0 / 0';
+                document.getElementById('progress-bar').style.width = '0%';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading initial state:', error);
+        });
 });
 </script>
 {% endblock %}
