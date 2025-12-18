@@ -9,6 +9,7 @@ import os
 import json
 import sys
 import threading
+import time
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
@@ -196,10 +197,21 @@ def run():
 def start_analysis():
     """Start the analysis in a background thread"""
     global analysis_state
-    
+
+    # CRITICAL FIX: Force reset state even if it says "running"
+    # This fixes the "Analysis already running" bug in production
     if analysis_state['running']:
-        return jsonify({'error': 'Analysis already running'}), 400
-    
+        # Check if actually running by looking at timestamp
+        current_time = time.time()
+        last_update = analysis_state.get('last_update', 0)
+
+        # If last update was more than 5 minutes ago, assume stale state
+        if current_time - last_update > 300:
+            analysis_state['logs'].append("⚠️ Detected stale state, forcing reset...")
+        else:
+            return jsonify({'error': 'Analysis already running'}), 400
+
+    # Always reset state completely for fresh start
     analysis_state = {
         'running': True,
         'current_query': 0,
@@ -208,13 +220,14 @@ def start_analysis():
         'eta_minutes': 0,
         'logs': [],
         'error': None,
-        'report_file': None
+        'report_file': None,
+        'last_update': time.time()
     }
-    
+
     thread = threading.Thread(target=run_analysis_background)
     thread.daemon = True
     thread.start()
-    
+
     return jsonify({'status': 'started'})
 
 
@@ -223,6 +236,9 @@ def run_analysis_background():
     global analysis_state
 
     try:
+        # Update timestamp at start
+        analysis_state['last_update'] = time.time()
+
         # Clear any existing checkpoint to ensure fresh analysis
         checkpoint_file = os.path.join(OUTPUT_FOLDER, 'checkpoint.json')
         if os.path.exists(checkpoint_file):
@@ -236,17 +252,20 @@ def run_analysis_background():
 
         analysis_state['total_queries'] = len(queries)
         analysis_state['logs'].append(f"Starting analysis of {len(queries)} queries...")
+        analysis_state['last_update'] = time.time()
 
         # Log each query for debugging
         for i, q in enumerate(queries, 1):
             analysis_state['logs'].append(f"  Query {i}: {q}")
 
+        analysis_state['last_update'] = time.time()
         processor = QueryProcessor(config)
         platform_results = processor.process_all_queries(queries)
 
         # Log summary of results to verify fresh data
         total_results = sum(len(results) for results in platform_results.values())
         analysis_state['logs'].append(f"Processed {total_results} total results across {len(platform_results)} platforms")
+        analysis_state['last_update'] = time.time()
 
         analysis_state['logs'].append("Generating Excel report...")
         report_gen = ReportGenerator(config)
@@ -261,11 +280,16 @@ def run_analysis_background():
 
         analysis_state['report_file'] = report_file
         analysis_state['logs'].append(f"✅ Complete! Report: {report_file}")
+        analysis_state['last_update'] = time.time()
         analysis_state['running'] = False
 
     except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
         analysis_state['error'] = str(e)
         analysis_state['logs'].append(f"❌ Error: {str(e)}")
+        analysis_state['logs'].append(f"Details: {error_detail[:500]}")  # First 500 chars
+        analysis_state['last_update'] = time.time()
         analysis_state['running'] = False
 
 
@@ -273,6 +297,26 @@ def run_analysis_background():
 def status():
     """Get current analysis status"""
     return jsonify(analysis_state)
+
+
+@app.route('/reset_state', methods=['POST'])
+def reset_state():
+    """Manually reset analysis state - useful for clearing stuck states"""
+    global analysis_state
+
+    analysis_state = {
+        'running': False,
+        'current_query': 0,
+        'total_queries': 0,
+        'platform_status': {},
+        'eta_minutes': 0,
+        'logs': ['State manually reset'],
+        'error': None,
+        'report_file': None,
+        'last_update': time.time()
+    }
+
+    return jsonify({'status': 'reset', 'message': 'Analysis state has been reset'})
 
 
 @app.route('/results')
