@@ -190,6 +190,27 @@ def configure():
 @app.route('/run')
 def run():
     """Run analysis page"""
+    global analysis_state
+
+    # Check for stale state when loading page
+    if analysis_state.get('running'):
+        current_time = time.time()
+        last_update = analysis_state.get('last_update', 0)
+
+        # If last update was more than 10 minutes ago, reset state
+        if current_time - last_update > 600:  # 10 minutes
+            analysis_state = {
+                'running': False,
+                'current_query': 0,
+                'total_queries': 0,
+                'platform_status': {},
+                'eta_minutes': 0,
+                'logs': [],
+                'error': None,
+                'report_file': None,
+                'last_update': time.time()
+            }
+
     return render_template('run.html')
 
 
@@ -296,7 +317,12 @@ def run_analysis_background():
 @app.route('/status')
 def status():
     """Get current analysis status"""
-    return jsonify(analysis_state)
+    response = jsonify(analysis_state)
+    # Prevent caching to ensure fresh state every time
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @app.route('/reset_state', methods=['POST'])

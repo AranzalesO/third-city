@@ -54,6 +54,13 @@
 let statusInterval = null;
 
 function startAnalysis() {
+    // Clear any old state from previous run
+    document.getElementById('logs').innerHTML = '';
+    document.getElementById('download-link').href = '#';
+    document.getElementById('complete-panel').style.display = 'none';
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('progress').textContent = '0 / 0';
+
     fetch('/start_analysis', { method: 'POST' })
         .then(response => response.json())
         .then(data => {
@@ -61,12 +68,11 @@ function startAnalysis() {
                 alert(data.error);
                 return;
             }
-            
+
             document.getElementById('start-btn').style.display = 'none';
             document.getElementById('stop-btn').style.display = 'inline-block';
             document.getElementById('status').textContent = 'Running...';
-            document.getElementById('complete-panel').style.display = 'none';
-            
+
             // Start polling for status
             statusInterval = setInterval(updateStatus, 2000);
         })
@@ -85,41 +91,43 @@ function stopAnalysis() {
 }
 
 function updateStatus() {
-    fetch('/status')
+    // Add timestamp to prevent caching
+    fetch('/status?_=' + new Date().getTime())
         .then(response => response.json())
         .then(data => {
             // Update progress
-            const progress = data.total_queries > 0 
+            const progress = data.total_queries > 0
                 ? Math.round((data.current_query / data.total_queries) * 100)
                 : 0;
-            
+
             document.getElementById('progress-bar').style.width = progress + '%';
-            document.getElementById('progress').textContent = 
+            document.getElementById('progress').textContent =
                 `${data.current_query} / ${data.total_queries}`;
-            
+
             // Update ETA
             if (data.eta_minutes > 0) {
                 document.getElementById('eta').textContent = `~${data.eta_minutes} minutes`;
             }
-            
+
             // Update logs
             const logsDiv = document.getElementById('logs');
             logsDiv.innerHTML = data.logs.map(log => `<div>${log}</div>`).join('');
             logsDiv.scrollTop = logsDiv.scrollHeight;
-            
+
             // Check if complete
             if (!data.running && data.report_file) {
                 clearInterval(statusInterval);
                 document.getElementById('status').textContent = 'Complete!';
                 document.getElementById('start-btn').style.display = 'inline-block';
                 document.getElementById('stop-btn').style.display = 'none';
-                
-                // Show complete panel
+
+                // Show complete panel with fresh download link
                 document.getElementById('complete-panel').style.display = 'block';
-                document.getElementById('download-link').href = 
-                    '/download/' + data.report_file.split('/').pop();
+                const filename = data.report_file.split('/').pop().split('\\').pop();
+                document.getElementById('download-link').href = '/download/' + filename;
+                console.log('Download link set to:', '/download/' + filename);
             }
-            
+
             // Check for errors
             if (data.error) {
                 clearInterval(statusInterval);
@@ -131,5 +139,18 @@ function updateStatus() {
             console.error('Error fetching status:', error);
         });
 }
+
+// Clear old state when page loads
+window.addEventListener('DOMContentLoaded', function() {
+    // If there's old state showing, clear it
+    const currentStatus = document.getElementById('status').textContent;
+    if (currentStatus === 'Complete!' || currentStatus === 'Running...') {
+        document.getElementById('status').textContent = 'Ready';
+        document.getElementById('complete-panel').style.display = 'none';
+        document.getElementById('logs').innerHTML = '';
+        document.getElementById('progress').textContent = '0 / 0';
+        document.getElementById('progress-bar').style.width = '0%';
+    }
+});
 </script>
 {% endblock %}
