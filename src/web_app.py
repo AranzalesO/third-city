@@ -61,7 +61,9 @@ def allowed_file(filename):
 def index():
     """Home page - Configuration form"""
     try:
-        config = ConfigManager()
+        # Always load from explicit path to avoid caching issues
+        config_file = os.path.join(CONFIG_FOLDER, 'config.json')
+        config = ConfigManager(config_file)
         existing_config = {
             'campaign_name': config.get_campaign_name(),
             'target_brand': config.get_target_brand(),
@@ -77,7 +79,7 @@ def index():
             'runs_per_query': 15,
             'platforms': ['chatgpt', 'gemini', 'perplexity']
         }
-    
+
     return render_template('index.html', config=existing_config)
 
 
@@ -174,11 +176,23 @@ def configure():
             'system_prompt': 'Answer as a UK consumer searching online. Keep answers factual and neutral.'
         }
         
-        # Save config to correct location
+        # Save config to correct location with explicit flushing
         config_file = os.path.join(CONFIG_FOLDER, 'config.json')
         with open(config_file, 'w') as f:
             json.dump(config_data, f, indent=2)
-        
+            f.flush()  # Force write to disk
+            os.fsync(f.fileno())  # Ensure OS writes to disk
+
+        # Small delay to ensure filesystem sync (especially for cloud platforms like Render)
+        time.sleep(0.5)
+
+        # Verify the file was actually written correctly
+        with open(config_file, 'r') as f:
+            verify_config = json.load(f)
+            if verify_config.get('campaign_name') != campaign_name:
+                flash(f'Warning: Config verification failed! Expected "{campaign_name}" but got "{verify_config.get("campaign_name")}"', 'error')
+                return redirect(url_for('index'))
+
         flash(f'Configuration saved! Ready to analyze {len(queries)} queries across {sum(platforms.values())} platforms', 'success')
         return redirect(url_for('run'))
         
@@ -268,7 +282,18 @@ def run_analysis_background():
 
         # Force reload config from file (don't use cached instance)
         config_file = os.path.join(CONFIG_FOLDER, 'config.json')
+
+        # DEBUG: Read raw JSON file to verify what's on disk
+        analysis_state['logs'].append(f"DEBUG: Reading config from: {config_file}")
+        with open(config_file, 'r') as f:
+            raw_config = json.load(f)
+            analysis_state['logs'].append(f"DEBUG: Raw campaign_name from file: '{raw_config.get('campaign_name')}'")
+            analysis_state['logs'].append(f"DEBUG: Raw target_brand from file: '{raw_config.get('target_brand')}'")
+
         config = ConfigManager(config_file)
+        analysis_state['logs'].append(f"DEBUG: ConfigManager campaign_name: '{config.get_campaign_name()}'")
+        analysis_state['logs'].append(f"DEBUG: ConfigManager target_brand: '{config.get_target_brand()}'")
+
         queries = config.get_queries()
 
         analysis_state['total_queries'] = len(queries)
@@ -289,7 +314,14 @@ def run_analysis_background():
         analysis_state['last_update'] = time.time()
 
         analysis_state['logs'].append("Generating Excel report...")
+        # Debug: Log config details
+        campaign_name_check = config.get_campaign_name()
+        analysis_state['logs'].append(f"DEBUG: Campaign name from config: '{campaign_name_check}'")
+        analysis_state['logs'].append(f"DEBUG: Target brand from config: '{config.get_target_brand()}'")
+
         report_gen = ReportGenerator(config)
+        analysis_state['logs'].append(f"DEBUG: ReportGenerator campaign_name: '{report_gen.campaign_name}'")
+
         report_file = report_gen.create_report(platform_results, OUTPUT_FOLDER)
 
         # Verify the file was actually created
