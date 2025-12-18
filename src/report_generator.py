@@ -19,31 +19,46 @@ class ReportGenerator:
         self.campaign_name = config_manager.get_campaign_name()
         self.target_brand = config_manager.get_target_brand()
     
-    def create_report(self, platform_results: Dict[str, List[Dict[str, Any]]], 
+    def create_report(self, platform_results: Dict[str, List[Dict[str, Any]]],
                      output_dir: str = "output") -> str:
         """Create Excel report from results - one sheet per platform"""
-        
+
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Create workbook
         wb = Workbook()
         wb.remove(wb.active)  # Remove default sheet
-        
+
         # Create sheet for each platform
         for platform_name, results in platform_results.items():
             self._create_platform_sheet(wb, platform_name, results)
-        
+
         # Add campaign info sheet
         self._create_campaign_info_sheet(wb)
-        
-        # Generate filename
+
+        # Generate filename with DEBUG logging
         timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-        filename = f"{output_dir}/{self.campaign_name.replace(' ', '_')}_{timestamp}.xlsx"
-        
+
+        # DEBUG: Log each step of filename generation
+        print(f"DEBUG FILENAME: self.campaign_name = '{self.campaign_name}'")
+        campaign_name_cleaned = self.campaign_name.replace(' ', '_')
+        print(f"DEBUG FILENAME: campaign_name_cleaned = '{campaign_name_cleaned}'")
+        print(f"DEBUG FILENAME: timestamp = '{timestamp}'")
+
+        filename = f"{output_dir}/{campaign_name_cleaned}_{timestamp}.xlsx"
+        print(f"DEBUG FILENAME: Final filename = '{filename}'")
+
         # Save
         wb.save(filename)
-        
+        print(f"DEBUG FILENAME: File saved to '{filename}'")
+
+        # Verify the file exists
+        if os.path.exists(filename):
+            print(f"DEBUG FILENAME: Verified file exists at '{filename}'")
+        else:
+            print(f"DEBUG FILENAME: WARNING - File NOT found at '{filename}'")
+
         return filename
     
     def _create_platform_sheet(self, wb: Workbook, platform_name: str, 

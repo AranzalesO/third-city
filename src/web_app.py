@@ -233,18 +233,21 @@ def start_analysis():
     """Start the analysis in a background thread"""
     global analysis_state
 
-    # CRITICAL FIX: Force reset state even if it says "running"
-    # This fixes the "Analysis already running" bug in production
-    if analysis_state['running']:
-        # Check if actually running by looking at timestamp
+    # CRITICAL: Prevent multiple analyses from running simultaneously
+    # This prevents config from being changed mid-analysis
+    if analysis_state.get('running', False):
         current_time = time.time()
         last_update = analysis_state.get('last_update', 0)
 
-        # If last update was more than 5 minutes ago, assume stale state
-        if current_time - last_update > 300:
-            analysis_state['logs'].append("⚠️ Detected stale state, forcing reset...")
+        # Only allow reset if truly stale (10 minutes, not 5)
+        if current_time - last_update > 600:  # 10 minutes
+            analysis_state['logs'].append("⚠️ Detected stale state (10+ min), forcing reset...")
         else:
-            return jsonify({'error': 'Analysis already running'}), 400
+            # Analysis is actively running - reject the request
+            time_running = int(current_time - last_update)
+            return jsonify({
+                'error': f'Analysis already running (active {time_running}s ago). Please wait for it to complete.'
+            }), 400
 
     # Always reset state completely for fresh start
     analysis_state = {
@@ -290,9 +293,17 @@ def run_analysis_background():
             analysis_state['logs'].append(f"DEBUG: Raw campaign_name from file: '{raw_config.get('campaign_name')}'")
             analysis_state['logs'].append(f"DEBUG: Raw target_brand from file: '{raw_config.get('target_brand')}'")
 
+        # CRITICAL: Create config instance ONCE and reuse it throughout
+        # This prevents issues if config.json is modified during analysis
         config = ConfigManager(config_file)
         analysis_state['logs'].append(f"DEBUG: ConfigManager campaign_name: '{config.get_campaign_name()}'")
         analysis_state['logs'].append(f"DEBUG: ConfigManager target_brand: '{config.get_target_brand()}'")
+
+        # Store campaign name immediately to prevent it from changing
+        locked_campaign_name = config.get_campaign_name()
+        locked_target_brand = config.get_target_brand()
+        analysis_state['logs'].append(f"🔒 LOCKED campaign_name: '{locked_campaign_name}'")
+        analysis_state['logs'].append(f"🔒 LOCKED target_brand: '{locked_target_brand}'")
 
         queries = config.get_queries()
 
@@ -314,11 +325,21 @@ def run_analysis_background():
         analysis_state['last_update'] = time.time()
 
         analysis_state['logs'].append("Generating Excel report...")
-        # Debug: Log config details
-        campaign_name_check = config.get_campaign_name()
-        analysis_state['logs'].append(f"DEBUG: Campaign name from config: '{campaign_name_check}'")
-        analysis_state['logs'].append(f"DEBUG: Target brand from config: '{config.get_target_brand()}'")
+        # Verify our locked values haven't changed
+        analysis_state['logs'].append(f"✓ Using LOCKED campaign_name: '{locked_campaign_name}'")
+        analysis_state['logs'].append(f"✓ Using LOCKED target_brand: '{locked_target_brand}'")
 
+        # Check if config file was modified during analysis (for debugging)
+        with open(config_file, 'r') as f:
+            current_config = json.load(f)
+            current_campaign = current_config.get('campaign_name', '')
+            if current_campaign != locked_campaign_name:
+                analysis_state['logs'].append(f"⚠️ WARNING: Config file was modified during analysis!")
+                analysis_state['logs'].append(f"   Started with: '{locked_campaign_name}'")
+                analysis_state['logs'].append(f"   File now has: '{current_campaign}'")
+                analysis_state['logs'].append(f"   Ignoring file changes - using original config")
+
+        # DO NOT re-read config - use the SAME instance we created at start
         report_gen = ReportGenerator(config)
         analysis_state['logs'].append(f"DEBUG: ReportGenerator campaign_name: '{report_gen.campaign_name}'")
 
