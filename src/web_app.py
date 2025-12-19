@@ -277,6 +277,24 @@ def start_analysis():
                 'error': f'Analysis already running (active {time_running}s ago). Please wait for it to complete.'
             }), 400
 
+    # CRITICAL: Log and clear any old report file from previous analysis
+    old_report = analysis_state.get('report_file')
+    if old_report:
+        print(f"[START ANALYSIS] Clearing old report from previous run: {old_report}")
+
+    # CRITICAL: Delete ALL old report files to prevent confusion
+    # This ensures fresh start and prevents showing wrong reports
+    import glob
+    old_reports = glob.glob(os.path.join(OUTPUT_FOLDER, '*.xlsx'))
+    if old_reports:
+        print(f"[START ANALYSIS] Deleting {len(old_reports)} old report file(s) for fresh start")
+        for report_path in old_reports:
+            try:
+                os.remove(report_path)
+                print(f"[START ANALYSIS] Deleted: {os.path.basename(report_path)}")
+            except Exception as e:
+                print(f"[START ANALYSIS] Could not delete {report_path}: {e}")
+
     # Always reset state completely for fresh start
     analysis_state = {
         'running': True,
@@ -286,9 +304,11 @@ def start_analysis():
         'eta_minutes': 0,
         'logs': [],
         'error': None,
-        'report_file': None,
+        'report_file': None,  # CRITICAL: Ensure this is None for fresh start
         'last_update': time.time()
     }
+
+    print(f"[START ANALYSIS] State reset complete - report_file is now: {analysis_state.get('report_file')}")
 
     thread = threading.Thread(target=run_analysis_background)
     thread.daemon = True
