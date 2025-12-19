@@ -363,7 +363,6 @@ def run_analysis_background():
         config_file = os.path.join(CONFIG_FOLDER, 'config.json')
 
         # DEBUG: Verify config file exists and check modification time
-        import os.path
         if os.path.exists(config_file):
             file_mtime = os.path.getmtime(config_file)
             file_age_seconds = time.time() - file_mtime
