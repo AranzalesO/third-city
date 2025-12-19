@@ -223,13 +223,24 @@ def run():
     """Run analysis page"""
     global analysis_state
 
-    # Check for stale state when loading page
+    # CRITICAL FIX: Clear report_file when user navigates to /run page
+    # This prevents showing old reports from previous analyses
+    if not analysis_state.get('running', False):
+        # If not currently running, clear any old report file
+        if analysis_state.get('report_file'):
+            print(f"[RUN PAGE] Clearing old report file: {analysis_state.get('report_file')}")
+            analysis_state['report_file'] = None
+            analysis_state['logs'] = []
+            analysis_state['error'] = None
+
+    # Check for stale running state
     if analysis_state.get('running'):
         current_time = time.time()
         last_update = analysis_state.get('last_update', 0)
 
         # If last update was more than 10 minutes ago, reset state
         if current_time - last_update > 600:  # 10 minutes
+            print(f"[RUN PAGE] Resetting stale running state (last update {int((current_time - last_update)/60)} min ago)")
             analysis_state = {
                 'running': False,
                 'current_query': 0,
