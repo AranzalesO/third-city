@@ -415,11 +415,28 @@ class QueryProcessor:
                 
                 parallel_time = time.time() - start_parallel
                 print(f"  ✅ Parallel execution completed in: {parallel_time:.1f}s")
-                
+
                 # Check if parallel is actually working
                 if parallel_time > 300:  # More than 5 minutes
                     print(f"  ⚠️  WARNING: Parallel execution seems slow - might be running sequentially!")
-                
+
+                # CRITICAL: Call progress callback to update state (prevents timeout on long campaigns)
+                if progress_callback:
+                    # Calculate ETA
+                    elapsed = (datetime.now() - start_time).total_seconds()
+                    if query_num > start_query + 1:
+                        avg_time_per_query = elapsed / (query_num - start_query - 1)
+                        remaining_queries = total_queries - query_num
+                        eta_minutes = int((avg_time_per_query * remaining_queries) / 60)
+                    else:
+                        eta_minutes = 0
+
+                    # Build platform status
+                    platform_status = {name: "complete" for name in self.clients.keys()}
+
+                    # Call callback with current progress
+                    progress_callback(query_num, total_queries, eta_minutes, platform_status)
+
                 # Save checkpoint after each query
                 self._save_checkpoint(checkpoint_file, platform_results, idx)
                 

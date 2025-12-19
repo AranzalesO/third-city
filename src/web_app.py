@@ -238,8 +238,8 @@ def run():
         current_time = time.time()
         last_update = analysis_state.get('last_update', 0)
 
-        # If last update was more than 10 minutes ago, reset state
-        if current_time - last_update > 600:  # 10 minutes
+        # If last update was more than 6 hours ago, reset state (handles very long campaigns)
+        if current_time - last_update > 21600:  # 6 hours (was 10 min, too aggressive)
             print(f"[RUN PAGE] Resetting stale running state (last update {int((current_time - last_update)/60)} min ago)")
             analysis_state = {
                 'running': False,
@@ -267,9 +267,9 @@ def start_analysis():
         current_time = time.time()
         last_update = analysis_state.get('last_update', 0)
 
-        # Only allow reset if truly stale (10 minutes, not 5)
-        if current_time - last_update > 600:  # 10 minutes
-            analysis_state['logs'].append("⚠️ Detected stale state (10+ min), forcing reset...")
+        # Only allow reset if truly stale (6 hours for very long campaigns)
+        if current_time - last_update > 21600:  # 6 hours (was 10 min, too aggressive)
+            analysis_state['logs'].append("⚠️ Detected stale state (6+ hours), forcing reset...")
         else:
             # Analysis is actively running - reject the request
             time_running = int(current_time - last_update)
@@ -277,23 +277,11 @@ def start_analysis():
                 'error': f'Analysis already running (active {time_running}s ago). Please wait for it to complete.'
             }), 400
 
-    # CRITICAL: Log and clear any old report file from previous analysis
+    # CRITICAL: Clear old report_file reference from state (but keep actual files)
     old_report = analysis_state.get('report_file')
     if old_report:
-        print(f"[START ANALYSIS] Clearing old report from previous run: {old_report}")
-
-    # CRITICAL: Delete ALL old report files to prevent confusion
-    # This ensures fresh start and prevents showing wrong reports
-    import glob
-    old_reports = glob.glob(os.path.join(OUTPUT_FOLDER, '*.xlsx'))
-    if old_reports:
-        print(f"[START ANALYSIS] Deleting {len(old_reports)} old report file(s) for fresh start")
-        for report_path in old_reports:
-            try:
-                os.remove(report_path)
-                print(f"[START ANALYSIS] Deleted: {os.path.basename(report_path)}")
-            except Exception as e:
-                print(f"[START ANALYSIS] Could not delete {report_path}: {e}")
+        print(f"[START ANALYSIS] Clearing old report reference: {old_report}")
+        print(f"[START ANALYSIS] Note: Old reports preserved in output/ folder - use Results page to manage")
 
     # Always reset state completely for fresh start
     analysis_state = {
@@ -365,7 +353,17 @@ def run_analysis_background():
 
         analysis_state['last_update'] = time.time()
         processor = QueryProcessor(config)
-        platform_results = processor.process_all_queries(queries)
+
+        # CRITICAL: Define progress callback to update last_update during long analyses
+        # This prevents 10-minute timeout from triggering on large campaigns
+        def update_progress(current_query, total_queries, eta_minutes, platform_status):
+            analysis_state['current_query'] = current_query
+            analysis_state['total_queries'] = total_queries
+            analysis_state['eta_minutes'] = eta_minutes
+            analysis_state['platform_status'] = platform_status
+            analysis_state['last_update'] = time.time()  # CRITICAL: Keep state fresh
+
+        platform_results = processor.process_all_queries(queries, progress_callback=update_progress)
 
         # Log summary of results to verify fresh data
         total_results = sum(len(results) for results in platform_results.values())
