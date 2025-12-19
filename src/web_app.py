@@ -468,9 +468,15 @@ def results():
 def download(filename):
     """Download a report file"""
     filepath = os.path.join(OUTPUT_FOLDER, secure_filename(filename))
-    
+
     if os.path.exists(filepath):
-        return send_file(filepath, as_attachment=True, download_name=filename)
+        response = send_file(filepath, as_attachment=True, download_name=filename)
+        # CRITICAL: Prevent browser from caching Excel files
+        # This ensures user always gets the latest report even if filename matches previous download
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     else:
         flash('File not found', 'error')
         return redirect(url_for('results'))

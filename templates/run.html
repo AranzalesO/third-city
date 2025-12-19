@@ -135,11 +135,14 @@ function updateStatus() {
                 const filename = data.report_file.replace(/\\/g, '/').split('/').pop();
                 console.log('Full report path:', data.report_file);
                 console.log('Extracted filename:', filename);
-                console.log('Setting download link to:', '/download/' + filename);
+
+                // Add timestamp to prevent browser from serving cached file
+                const downloadUrl = '/download/' + filename + '?t=' + new Date().getTime();
+                console.log('Setting download link to:', downloadUrl);
 
                 // Show complete panel with fresh download link
                 document.getElementById('complete-panel').style.display = 'block';
-                document.getElementById('download-link').href = '/download/' + filename;
+                document.getElementById('download-link').href = downloadUrl;
             }
 
             // Check for errors
