@@ -178,6 +178,11 @@ def configure():
         
         # Save config to correct location with explicit flushing
         config_file = os.path.join(CONFIG_FOLDER, 'config.json')
+        print(f"[CONFIG SAVE] Saving config to: {config_file}")
+        print(f"[CONFIG SAVE] Campaign name: '{campaign_name}'")
+        print(f"[CONFIG SAVE] Target brand: '{target_brand}'")
+        print(f"[CONFIG SAVE] Queries: {queries}")
+
         with open(config_file, 'w') as f:
             json.dump(config_data, f, indent=2)
             f.flush()  # Force write to disk
@@ -189,11 +194,23 @@ def configure():
         # Verify the file was actually written correctly
         with open(config_file, 'r') as f:
             verify_config = json.load(f)
-            if verify_config.get('campaign_name') != campaign_name:
-                flash(f'Warning: Config verification failed! Expected "{campaign_name}" but got "{verify_config.get("campaign_name")}"', 'error')
-                return redirect(url_for('index'))
+            verified_name = verify_config.get('campaign_name')
+            verified_brand = verify_config.get('target_brand')
 
-        flash(f'Configuration saved! Ready to analyze {len(queries)} queries across {sum(platforms.values())} platforms', 'success')
+            print(f"[CONFIG VERIFY] Read back campaign_name: '{verified_name}'")
+            print(f"[CONFIG VERIFY] Read back target_brand: '{verified_brand}'")
+
+            if verified_name != campaign_name:
+                error_msg = f'Config verification failed! Expected "{campaign_name}" but got "{verified_name}"'
+                print(f"[CONFIG ERROR] {error_msg}")
+                flash(f'Warning: {error_msg}', 'error')
+                return redirect(url_for('index'))
+            else:
+                print(f"[CONFIG SUCCESS] Verification passed ✓")
+
+        success_msg = f'Configuration saved! Ready to analyze {len(queries)} queries across {sum(platforms.values())} platforms'
+        print(f"[CONFIG SAVE] {success_msg}")
+        flash(success_msg, 'success')
         return redirect(url_for('run'))
         
     except Exception as e:
