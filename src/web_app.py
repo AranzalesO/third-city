@@ -178,35 +178,61 @@ def configure():
         
         # Save config to correct location with explicit flushing
         config_file = os.path.join(CONFIG_FOLDER, 'config.json')
+        print(f"[CONFIG SAVE] ========================================")
         print(f"[CONFIG SAVE] Saving config to: {config_file}")
         print(f"[CONFIG SAVE] Campaign name: '{campaign_name}'")
         print(f"[CONFIG SAVE] Target brand: '{target_brand}'")
-        print(f"[CONFIG SAVE] Queries: {queries}")
+        print(f"[CONFIG SAVE] Queries ({len(queries)} total): {queries[:3]}...")  # Show first 3
+        print(f"[CONFIG SAVE] Platforms: {platforms}")
 
         with open(config_file, 'w') as f:
             json.dump(config_data, f, indent=2)
             f.flush()  # Force write to disk
             os.fsync(f.fileno())  # Ensure OS writes to disk
 
-        # Small delay to ensure filesystem sync (especially for cloud platforms like Render)
-        time.sleep(0.5)
+        print(f"[CONFIG SAVE] File written and flushed to disk")
+
+        # CRITICAL: Longer delay for Render's networked filesystem to sync
+        # Render uses networked storage which can have propagation delays
+        print(f"[CONFIG SAVE] Waiting 2 seconds for filesystem sync...")
+        time.sleep(2.0)  # Increased from 0.5s to 2.0s for Render
 
         # Verify the file was actually written correctly
+        print(f"[CONFIG VERIFY] Reading back from disk to verify...")
         with open(config_file, 'r') as f:
             verify_config = json.load(f)
             verified_name = verify_config.get('campaign_name')
             verified_brand = verify_config.get('target_brand')
+            verified_queries = verify_config.get('queries', [])
 
             print(f"[CONFIG VERIFY] Read back campaign_name: '{verified_name}'")
             print(f"[CONFIG VERIFY] Read back target_brand: '{verified_brand}'")
+            print(f"[CONFIG VERIFY] Read back queries count: {len(verified_queries)}")
 
+            # Check campaign name
             if verified_name != campaign_name:
-                error_msg = f'Config verification failed! Expected "{campaign_name}" but got "{verified_name}"'
+                error_msg = f'Config verification failed! Expected campaign_name="{campaign_name}" but got "{verified_name}"'
                 print(f"[CONFIG ERROR] {error_msg}")
                 flash(f'Warning: {error_msg}', 'error')
                 return redirect(url_for('index'))
-            else:
-                print(f"[CONFIG SUCCESS] Verification passed ✓")
+
+            # Check target brand
+            if verified_brand != target_brand:
+                error_msg = f'Config verification failed! Expected target_brand="{target_brand}" but got "{verified_brand}"'
+                print(f"[CONFIG ERROR] {error_msg}")
+                flash(f'Warning: {error_msg}', 'error')
+                return redirect(url_for('index'))
+
+            # Check queries
+            if len(verified_queries) != len(queries):
+                error_msg = f'Config verification failed! Expected {len(queries)} queries but got {len(verified_queries)}'
+                print(f"[CONFIG ERROR] {error_msg}")
+                flash(f'Warning: {error_msg}', 'error')
+                return redirect(url_for('index'))
+
+            print(f"[CONFIG SUCCESS] ✅ All verification checks passed!")
+            print(f"[CONFIG SUCCESS] Campaign: '{verified_name}' | Brand: '{verified_brand}' | Queries: {len(verified_queries)}")
+            print(f"[CONFIG SAVE] ========================================")
 
         success_msg = f'Configuration saved! Ready to analyze {len(queries)} queries across {sum(platforms.values())} platforms'
         print(f"[CONFIG SAVE] {success_msg}")
@@ -233,13 +259,27 @@ def run():
             analysis_state['logs'] = []
             analysis_state['error'] = None
 
+    # Show current config to help debug issues
+    current_config = {}
+    try:
+        config_file = os.path.join(CONFIG_FOLDER, 'config.json')
+        with open(config_file, 'r') as f:
+            raw_config = json.load(f)
+            current_config = {
+                'campaign_name': raw_config.get('campaign_name', 'N/A'),
+                'target_brand': raw_config.get('target_brand', 'N/A'),
+                'query_count': len(raw_config.get('queries', []))
+            }
+    except Exception as e:
+        current_config = {'error': str(e)}
+
     # Check for stale running state
     if analysis_state.get('running'):
         current_time = time.time()
         last_update = analysis_state.get('last_update', 0)
 
         # If last update was more than 6 hours ago, reset state (handles very long campaigns)
-        if current_time - last_update > 21600:  # 6 hours (was 10 min, too aggressive)
+        if current_time - last_update > 2160000:  # 6 hours (was 10 min, too aggressive)
             print(f"[RUN PAGE] Resetting stale running state (last update {int((current_time - last_update)/60)} min ago)")
             analysis_state = {
                 'running': False,
@@ -253,7 +293,7 @@ def run():
                 'last_update': time.time()
             }
 
-    return render_template('run.html')
+    return render_template('run.html', current_config=current_config)
 
 
 @app.route('/start_analysis', methods=['POST'])
@@ -322,18 +362,29 @@ def run_analysis_background():
         # Force reload config from file (don't use cached instance)
         config_file = os.path.join(CONFIG_FOLDER, 'config.json')
 
+        # DEBUG: Verify config file exists and check modification time
+        import os.path
+        if os.path.exists(config_file):
+            file_mtime = os.path.getmtime(config_file)
+            file_age_seconds = time.time() - file_mtime
+            analysis_state['logs'].append(f"✓ Config file exists: {config_file}")
+            analysis_state['logs'].append(f"✓ File last modified: {file_age_seconds:.1f} seconds ago")
+        else:
+            analysis_state['logs'].append(f"❌ ERROR: Config file not found: {config_file}")
+
         # DEBUG: Read raw JSON file to verify what's on disk
-        analysis_state['logs'].append(f"DEBUG: Reading config from: {config_file}")
+        analysis_state['logs'].append(f"📖 Reading config from disk...")
         with open(config_file, 'r') as f:
             raw_config = json.load(f)
-            analysis_state['logs'].append(f"DEBUG: Raw campaign_name from file: '{raw_config.get('campaign_name')}'")
-            analysis_state['logs'].append(f"DEBUG: Raw target_brand from file: '{raw_config.get('target_brand')}'")
+            analysis_state['logs'].append(f"📖 Raw campaign_name from file: '{raw_config.get('campaign_name')}'")
+            analysis_state['logs'].append(f"📖 Raw target_brand from file: '{raw_config.get('target_brand')}'")
+            analysis_state['logs'].append(f"📖 Raw queries count: {len(raw_config.get('queries', []))}")
 
         # CRITICAL: Create config instance ONCE and reuse it throughout
         # This prevents issues if config.json is modified during analysis
         config = ConfigManager(config_file)
-        analysis_state['logs'].append(f"DEBUG: ConfigManager campaign_name: '{config.get_campaign_name()}'")
-        analysis_state['logs'].append(f"DEBUG: ConfigManager target_brand: '{config.get_target_brand()}'")
+        analysis_state['logs'].append(f"📖 ConfigManager campaign_name: '{config.get_campaign_name()}'")
+        analysis_state['logs'].append(f"📖 ConfigManager target_brand: '{config.get_target_brand()}'")
 
         # Store campaign name immediately to prevent it from changing
         locked_campaign_name = config.get_campaign_name()
