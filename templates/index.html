@@ -1,153 +1,171 @@
 {% extends "layout.html" %}
 
-{% block title %}Configure - Brand Monitoring Tool{% endblock %}
+{% block title %}Configurar · Geoco{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>📋 Configure Analysis</h2>
-    <p>Set up your brand monitoring campaign</p>
+    <h2>📋 Configurar análisis</h2>
+    <p>Define tu campaña de monitoreo de marca</p>
 </div>
 
 <form method="POST" action="{{ url_for('configure') }}" enctype="multipart/form-data" class="config-form">
 
     <div class="form-section">
-        <h3>Campaign Details</h3>
+        <h3>Detalles de la campaña</h3>
 
         <div class="form-group">
-            <label for="campaign_name">Campaign Name</label>
-            <input type="text" id="campaign_name" name="campaign_name" value="" required>
+            <label for="campaign_name">Nombre de la campaña</label>
+            <input type="text" id="campaign_name" name="campaign_name" value="" required
+                placeholder="Ej.: Campaña Verano 2026">
         </div>
 
         <div class="form-group">
-            <label for="target_brand">Target Brand *</label>
+            <label for="target_brand">Marca objetivo <span class="req">*</span></label>
             <input type="text" id="target_brand" name="target_brand" value="" required
-                placeholder="e.g., Dr Martens">
+                placeholder="Ej.: Dr Martens">
         </div>
 
         <div class="form-group">
-            <label for="competitors">Competitors (comma-separated)</label>
+            <label for="competitors">Competidores <small style="display:inline">(separados por comas)</small></label>
             <textarea id="competitors" name="competitors" rows="3"
-                placeholder="e.g., Birkenstock, UGG, Crocs, Teva, Keen"></textarea>
+                placeholder="Ej.: Birkenstock, UGG, Crocs, Teva, Keen"></textarea>
         </div>
     </div>
 
     <div class="form-section">
-        <h3>Models/Products (Optional)</h3>
+        <h3>Modelos / Productos <small style="display:inline; font-weight:500; color:var(--muted)">(opcional)</small></h3>
 
         <div class="form-group">
-            <label for="models">Product Models (comma-separated)</label>
+            <label for="models">Modelos de producto <small style="display:inline">(separados por comas)</small></label>
             <textarea id="models" name="models" rows="3"
-                placeholder="e.g., Blaire, Gryphon, Myles, Terry (for Dr Martens sandals)"></textarea>
-            <small>List specific product names/models to track mentions</small>
+                placeholder="Ej.: Blaire, Gryphon, Myles, Terry (sandalias Dr Martens)"></textarea>
+            <small>Lista nombres o modelos específicos para rastrear sus menciones.</small>
         </div>
     </div>
 
     <div class="form-section">
-        <h3>Key Messages to Track</h3>
-        <p><small>Edit category names below - they will appear in your report columns</small></p>
+        <h3>Mensajes clave a rastrear</h3>
+        <p class="section-hint">Edita los nombres de las categorías — aparecerán como columnas en tu informe.</p>
 
-        <div class="form-group">
-            <label for="category_name_1">Category 1 Name</label>
-            <input type="text" id="category_name_1" name="category_name_1" value=""
-                placeholder="e.g., Comfort, Sustainability">
-        </div>
-        <div class="form-group">
-            <label for="keywords_1">Category 1 Keywords (comma-separated)</label>
-            <input type="text" id="keywords_1" name="keywords_1"
-                placeholder="e.g., comfortable, cushioned, soft, padded"
-                value="">
-        </div>
-
-        <div class="form-group">
-            <label for="category_name_2">Category 2 Name</label>
-            <input type="text" id="category_name_2" name="category_name_2" value=""
-                placeholder="e.g., Quality, Craftsmanship">
-        </div>
-        <div class="form-group">
-            <label for="keywords_2">Category 2 Keywords (comma-separated)</label>
-            <input type="text" id="keywords_2" name="keywords_2" placeholder="e.g., quality, durable, well-made"
-                value="">
+        <div class="cat-block">
+            <div class="form-group">
+                <label for="category_name_1">Nombre de la categoría 1</label>
+                <input type="text" id="category_name_1" name="category_name_1" value=""
+                    placeholder="Ej.: Comodidad, Sostenibilidad">
+            </div>
+            <div class="form-group">
+                <label for="keywords_1">Palabras clave de la categoría 1 <small style="display:inline">(separadas por comas)</small></label>
+                <input type="text" id="keywords_1" name="keywords_1"
+                    placeholder="Ej.: cómodo, acolchado, suave"
+                    value="">
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="category_name_3">Category 3 Name</label>
-            <input type="text" id="category_name_3" name="category_name_3" value=""
-                placeholder="e.g., Durability, Longevity">
-        </div>
-        <div class="form-group">
-            <label for="keywords_3">Category 3 Keywords (comma-separated)</label>
-            <input type="text" id="keywords_3" name="keywords_3" placeholder="e.g., durable, last, withstand"
-                value="">
+        <div class="cat-block">
+            <div class="form-group">
+                <label for="category_name_2">Nombre de la categoría 2</label>
+                <input type="text" id="category_name_2" name="category_name_2" value=""
+                    placeholder="Ej.: Calidad, Manufactura">
+            </div>
+            <div class="form-group">
+                <label for="keywords_2">Palabras clave de la categoría 2 <small style="display:inline">(separadas por comas)</small></label>
+                <input type="text" id="keywords_2" name="keywords_2" placeholder="Ej.: calidad, durable, bien hecho"
+                    value="">
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="category_name_4">Category 4 Name</label>
-            <input type="text" id="category_name_4" name="category_name_4" value=""
-                placeholder="e.g., Style, Fashion">
+        <div class="cat-block">
+            <div class="form-group">
+                <label for="category_name_3">Nombre de la categoría 3</label>
+                <input type="text" id="category_name_3" name="category_name_3" value=""
+                    placeholder="Ej.: Durabilidad, Longevidad">
+            </div>
+            <div class="form-group">
+                <label for="keywords_3">Palabras clave de la categoría 3 <small style="display:inline">(separadas por comas)</small></label>
+                <input type="text" id="keywords_3" name="keywords_3" placeholder="Ej.: duradero, resistente, aguanta"
+                    value="">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="keywords_4">Category 4 Keywords (comma-separated)</label>
-            <input type="text" id="keywords_4" name="keywords_4" placeholder="e.g., stylish, fashionable, trendy"
-                value="">
+
+        <div class="cat-block">
+            <div class="form-group">
+                <label for="category_name_4">Nombre de la categoría 4</label>
+                <input type="text" id="category_name_4" name="category_name_4" value=""
+                    placeholder="Ej.: Estilo, Moda">
+            </div>
+            <div class="form-group">
+                <label for="keywords_4">Palabras clave de la categoría 4 <small style="display:inline">(separadas por comas)</small></label>
+                <input type="text" id="keywords_4" name="keywords_4" placeholder="Ej.: con estilo, moderno, a la moda"
+                    value="">
+            </div>
         </div>
     </div>
 
     <div class="form-section">
-        <h3>Queries</h3>
+        <h3>Consultas</h3>
 
         <div class="form-group">
-            <label for="queries_text">Enter Queries (one per line)</label>
+            <label for="queries_text">Ingresa las consultas <small style="display:inline">(una por línea)</small></label>
             <textarea id="queries_text" name="queries_text" rows="10"
-                placeholder="Are Dr Martens sandals comfortable?&#10;Do Dr Martens sandals need breaking in?&#10;Are Dr Martens sandals true to size?"></textarea>
+                placeholder="¿Son cómodas las sandalias Dr Martens?&#10;¿Las sandalias Dr Martens necesitan ablandarse?&#10;¿Las sandalias Dr Martens tallan bien?"></textarea>
         </div>
 
         <div class="form-group">
-            <label for="queries_file">Or Upload Queries File (.txt)</label>
+            <label for="queries_file">O sube un archivo de consultas (.txt)</label>
             <input type="file" id="queries_file" name="queries_file" accept=".txt">
-            <small>Upload a .txt file with one query per line</small>
+            <small>Sube un archivo .txt con una consulta por línea.</small>
         </div>
     </div>
 
     <div class="form-section">
-        <h3>Analysis Settings</h3>
+        <h3>Ajustes del análisis</h3>
 
         <div class="form-group">
-            <label for="runs_per_query">Runs Per Query: <span id="runs_value">{{ config.runs_per_query }}</span></label>
+            <label for="runs_per_query">Ejecuciones por consulta:
+                <span class="runs-readout"><span id="runs_value">{{ config.runs_per_query }}</span></span>
+            </label>
             <input type="range" id="runs_per_query" name="runs_per_query" min="5" max="100"
                 value="{{ config.runs_per_query }}" step="5">
-            <small>More runs = more reliable data but longer processing time (15 runs ≈ 1.7 hours for 37
-                queries)</small>
+            <small>Más ejecuciones = datos más fiables, pero mayor tiempo de procesamiento (15 ejecuciones ≈ 1,7 h para 37 consultas).</small>
         </div>
 
         <div class="form-group">
-            <label>Platforms *</label>
-            <div class="checkbox-group">
-                <label>
-                    <input type="checkbox" name="platforms" value="chatgpt" {% if 'chatgpt' in config.platforms
-                        %}checked{% endif %}>
-                    ChatGPT (Fast, ~3s per call)
+            <label>Plataformas <span class="req">*</span></label>
+            <div class="platform-grid">
+                <label class="platform-card">
+                    <input type="checkbox" name="platforms" value="chatgpt" {% if 'chatgpt' in config.platforms %}checked{% endif %}>
+                    <span class="pc-check"></span>
+                    <span class="pc-body">
+                        <span class="pc-name">ChatGPT</span>
+                        <span class="pc-meta">Rápido · ~3s por llamada</span>
+                    </span>
                 </label>
-                <label>
-                    <input type="checkbox" name="platforms" value="gemini" {% if 'gemini' in config.platforms
-                        %}checked{% endif %}>
-                    Gemini (Fast, ~4s per call)
+                <label class="platform-card">
+                    <input type="checkbox" name="platforms" value="gemini" {% if 'gemini' in config.platforms %}checked{% endif %}>
+                    <span class="pc-check"></span>
+                    <span class="pc-body">
+                        <span class="pc-name">Gemini</span>
+                        <span class="pc-meta">Rápido · ~4s por llamada</span>
+                    </span>
                 </label>
-                <label>
-                    <input type="checkbox" name="platforms" value="perplexity" {% if 'perplexity' in config.platforms
-                        %}checked{% endif %}>
-                    Perplexity (Slower, ~9s per call)
+                <label class="platform-card">
+                    <input type="checkbox" name="platforms" value="perplexity" {% if 'perplexity' in config.platforms %}checked{% endif %}>
+                    <span class="pc-check"></span>
+                    <span class="pc-body">
+                        <span class="pc-name">Perplexity</span>
+                        <span class="pc-meta">Más lento · ~9s por llamada</span>
+                    </span>
                 </label>
             </div>
         </div>
     </div>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save & Continue to Run →</button>
+        <button type="submit" class="btn btn-primary btn-large">Guardar y continuar →</button>
     </div>
 </form>
 
 <script>
-    // Update slider value display
     document.getElementById('runs_per_query').addEventListener('input', function () {
         document.getElementById('runs_value').textContent = this.value;
     });

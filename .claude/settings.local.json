@@ -1,10 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)",
-      "Bash(mkdir:*)"
-    ],
-    "deny": [],
-    "ask": []
+      "PowerShell(python -m venv venv)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -m pip install --quiet --upgrade pip)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -m pip install --quiet -r requirements.txt)",
+      "PowerShell($env:FLASK_ENV=\"development\"; .\\\\venv\\\\Scripts\\\\python.exe src\\\\web_app.py)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5000/)",
+      "Bash(curl -s http://localhost:5000/)",
+      "Bash(curl -s -o /dev/null -w \"run page: HTTP %{http_code}\\\\n\" http://localhost:5000/run)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}  size=%{size_download} bytes  type=%{content_type}\\\\n\" \"http://localhost:5000/download/V%C3%A9lez_campaign_20260623_0758.xlsx\")"
+    ]
   }
 }

@@ -73,7 +73,7 @@ def index():
         }
     except:
         existing_config = {
-            'campaign_name': 'My Campaign',
+            'campaign_name': 'Mi campaña',
             'target_brand': '',
             'competitors': '',
             'runs_per_query': 15,
@@ -514,13 +514,29 @@ def results():
     return render_template('results.html', reports=reports)
 
 
-@app.route('/download/<filename>')
+def _safe_output_path(filename):
+    """Resolve a filename to a path inside OUTPUT_FOLDER, preventing path
+    traversal WITHOUT stripping Unicode characters (secure_filename mangles
+    accented names like 'Vélez_...' -> 'Vlez_...', breaking downloads)."""
+    # Strip any directory components to block traversal (e.g. ../../etc)
+    name = os.path.basename(filename)
+    filepath = os.path.normpath(os.path.join(OUTPUT_FOLDER, name))
+
+    # Ensure the resolved path is still inside OUTPUT_FOLDER
+    output_abs = os.path.abspath(OUTPUT_FOLDER)
+    if os.path.commonpath([os.path.abspath(filepath), output_abs]) != output_abs:
+        return None
+    return filepath
+
+
+@app.route('/download/<path:filename>')
 def download(filename):
     """Download a report file"""
-    filepath = os.path.join(OUTPUT_FOLDER, secure_filename(filename))
+    filepath = _safe_output_path(filename)
 
-    if os.path.exists(filepath):
-        response = send_file(filepath, as_attachment=True, download_name=filename)
+    if filepath and os.path.exists(filepath):
+        response = send_file(filepath, as_attachment=True,
+                             download_name=os.path.basename(filepath))
         # CRITICAL: Prevent browser from caching Excel files
         # This ensures user always gets the latest report even if filename matches previous download
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -528,20 +544,20 @@ def download(filename):
         response.headers['Expires'] = '0'
         return response
     else:
-        flash('File not found', 'error')
+        flash('Archivo no encontrado', 'error')
         return redirect(url_for('results'))
 
 
-@app.route('/delete/<filename>', methods=['POST'])
+@app.route('/delete/<path:filename>', methods=['POST'])
 def delete_report(filename):
     """Delete a report file"""
-    filepath = os.path.join(OUTPUT_FOLDER, secure_filename(filename))
-    
-    if os.path.exists(filepath):
+    filepath = _safe_output_path(filename)
+
+    if filepath and os.path.exists(filepath):
         os.remove(filepath)
-        flash(f'Deleted {filename}', 'success')
+        flash(f'Informe eliminado: {os.path.basename(filepath)}', 'success')
     else:
-        flash('File not found', 'error')
+        flash('Archivo no encontrado', 'error')
     return redirect(url_for('results'))
 
 

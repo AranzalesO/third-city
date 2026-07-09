@@ -1,27 +1,27 @@
 {% extends "layout.html" %}
 
-{% block title %}Run Analysis - Brand Monitoring Tool{% endblock %}
+{% block title %}Ejecutar análisis · Geoco{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>▶️ Run Analysis</h2>
-    <p>Monitor real-time progress of your brand analysis</p>
+    <h2>▶️ Ejecutar análisis</h2>
+    <p>Monitorea el progreso de tu análisis en tiempo real</p>
 </div>
 
 <div class="run-container">
     <div id="status-panel" class="status-panel">
         <div class="status-item">
-            <span class="status-label">Status:</span>
-            <span id="status" class="status-value">Ready</span>
+            <span class="status-label">⚡ Estado</span>
+            <span id="status" class="status-value">Listo</span>
         </div>
         <div class="status-item">
-            <span class="status-label">Progress:</span>
+            <span class="status-label">📊 Progreso</span>
             <span id="progress" class="status-value">0 / 0</span>
         </div>
-        <!-- <div class="status-item">
-            <span class="status-label">ETA:</span>
-            <span id="eta" class="status-value">-</span>
-        </div> -->
+        <div class="status-item">
+            <span class="status-label">⏱️ Tiempo restante</span>
+            <span id="eta" class="status-value">—</span>
+        </div>
     </div>
 
     <div class="progress-bar-container">
@@ -29,38 +29,38 @@
     </div>
 
     {% if current_config %}
-    <div class="config-preview" style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 20px 0;">
-        <h4 style="margin-top: 0;">📋 Current Configuration</h4>
-        <div style="font-family: monospace; font-size: 14px;">
-            <div><strong>Campaign:</strong> {{ current_config.campaign_name }}</div>
-            <div><strong>Target Brand:</strong> {{ current_config.target_brand }}</div>
-            <div><strong>Queries:</strong> {{ current_config.query_count }}</div>
+    <div class="config-preview">
+        <h4>📋 Configuración actual</h4>
+        <div class="preview-grid">
+            <span class="preview-pill"><strong>Campaña:</strong> {{ current_config.campaign_name }}</span>
+            <span class="preview-pill"><strong>Marca objetivo:</strong> {{ current_config.target_brand }}</span>
+            <span class="preview-pill"><strong>Consultas:</strong> {{ current_config.query_count }}</span>
         </div>
-        <div style="margin-top: 10px; font-size: 13px; color: #666;">
-            ⚠️ This is what will be analyzed when you click Start Analysis. If incorrect, go to <a href="{{ url_for('index') }}">Configure</a> and save your changes.
+        <div class="preview-note">
+            ⚠️ Esto es lo que se analizará al iniciar. Si algo es incorrecto, ve a <a href="{{ url_for('index') }}">Configurar</a> y guarda tus cambios.
         </div>
     </div>
     {% endif %}
 
     <div class="controls">
         <button id="start-btn" class="btn btn-primary btn-large" onclick="startAnalysis()">
-            ▶️ Start Analysis
+            ▶️ Iniciar análisis
         </button>
         <button id="stop-btn" class="btn btn-secondary" onclick="stopAnalysis()" style="display:none;">
-            ⏹️ Stop
+            ⏹️ Detener
         </button>
     </div>
 
     <div class="logs-container">
-        <h3>Console Output</h3>
+        <h3>🖥️ Salida de consola</h3>
         <div id="logs" class="logs"></div>
     </div>
 
     <div id="complete-panel" class="complete-panel" style="display:none;">
-        <h3>✅ Analysis Complete!</h3>
-        <p>Your report is ready to download.</p>
-        <a id="download-link" href="#" class="btn btn-primary">📥 Download Report</a>
-        <a href="{{ url_for('results') }}" class="btn btn-secondary">View All Results</a>
+        <h3>✅ ¡Análisis completado!</h3>
+        <p>Tu informe está listo para descargar.</p>
+        <a id="download-link" href="#" class="btn btn-primary">📥 Descargar informe</a>
+        <a href="{{ url_for('results') }}" class="btn btn-secondary">Ver todos los resultados</a>
     </div>
 </div>
 
@@ -80,6 +80,7 @@ function startAnalysis() {
     document.getElementById('complete-panel').style.display = 'none';
     document.getElementById('progress-bar').style.width = '0%';
     document.getElementById('progress').textContent = '0 / 0';
+    document.getElementById('eta').textContent = '—';
 
     fetch('/start_analysis', { method: 'POST', cache: 'no-store' })
         .then(response => response.json())
@@ -90,23 +91,23 @@ function startAnalysis() {
             }
 
             document.getElementById('start-btn').style.display = 'none';
-            document.getElementById('stop-btn').style.display = 'inline-block';
-            document.getElementById('status').textContent = 'Running...';
+            document.getElementById('stop-btn').style.display = 'inline-flex';
+            document.getElementById('status').textContent = 'Ejecutando…';
 
             // Start polling for status
             statusInterval = setInterval(updateStatus, 2000);
         })
         .catch(error => {
-            alert('Error starting analysis: ' + error);
+            alert('Error al iniciar el análisis: ' + error);
         });
 }
 
 function stopAnalysis() {
-    if (confirm('Are you sure you want to stop the analysis?')) {
+    if (confirm('¿Seguro que deseas detener el análisis?')) {
         clearInterval(statusInterval);
-        document.getElementById('start-btn').style.display = 'inline-block';
+        document.getElementById('start-btn').style.display = 'inline-flex';
         document.getElementById('stop-btn').style.display = 'none';
-        document.getElementById('status').textContent = 'Stopped';
+        document.getElementById('status').textContent = 'Detenido';
     }
 }
 
@@ -127,8 +128,9 @@ function updateStatus() {
                 `${data.current_query} / ${data.total_queries}`;
 
             // Update ETA
-            if (data.eta_minutes > 0) {
-                document.getElementById('eta').textContent = `~${data.eta_minutes} minutes`;
+            const etaEl = document.getElementById('eta');
+            if (etaEl) {
+                etaEl.textContent = data.eta_minutes > 0 ? `~${data.eta_minutes} min` : '—';
             }
 
             // Update logs
@@ -141,8 +143,8 @@ function updateStatus() {
                 clearInterval(statusInterval);
                 statusInterval = null;  // Clear the reference
 
-                document.getElementById('status').textContent = 'Complete!';
-                document.getElementById('start-btn').style.display = 'inline-block';
+                document.getElementById('status').textContent = '¡Completado!';
+                document.getElementById('start-btn').style.display = 'inline-flex';
                 document.getElementById('stop-btn').style.display = 'none';
 
                 // Extract filename from path (handle both / and \)
@@ -163,7 +165,7 @@ function updateStatus() {
             if (data.error) {
                 clearInterval(statusInterval);
                 statusInterval = null;
-                document.getElementById('status').textContent = 'Error!';
+                document.getElementById('status').textContent = '¡Error!';
                 alert('Error: ' + data.error);
             }
         })
@@ -184,21 +186,16 @@ window.addEventListener('DOMContentLoaded', function() {
 
             // If server says not running, ensure UI reflects that
             if (!data.running) {
-                document.getElementById('status').textContent = 'Ready';
-                document.getElementById('start-btn').style.display = 'inline-block';
+                document.getElementById('status').textContent = 'Listo';
+                document.getElementById('start-btn').style.display = 'inline-flex';
                 document.getElementById('stop-btn').style.display = 'none';
-
-                // Only show complete panel if there's actually a report file
-                if (data.report_file) {
-                    console.log('Found existing report:', data.report_file);
-                    // Don't show it - let user start fresh
-                }
 
                 // Clear UI for fresh start
                 document.getElementById('complete-panel').style.display = 'none';
                 document.getElementById('logs').innerHTML = '';
                 document.getElementById('progress').textContent = '0 / 0';
                 document.getElementById('progress-bar').style.width = '0%';
+                document.getElementById('eta').textContent = '—';
             }
         })
         .catch(error => {

@@ -1,4 +1,3 @@
 // static/script.js
-
-// Any additional JavaScript can go here
-console.log('Brand Monitoring Tool - Web Interface Loaded');
+// Geoco — Análisis de Marca Multiplataforma con IA
+console.log('Geoco — Interfaz web cargada');
