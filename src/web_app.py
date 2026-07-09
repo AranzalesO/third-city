@@ -3,7 +3,7 @@
 Flask Web Application - Brand Monitoring Tool
 """
 
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, flash, session
 from flask_cors import CORS
 import os
 import json
@@ -22,6 +22,7 @@ sys.path.insert(0, SRC_DIR)
 from config_manager import ConfigManager
 from query_processor import QueryProcessor
 from report_generator import ReportGenerator
+from translations import TRANSLATIONS, DEFAULT_LANG, get_translator
 import secrets
 
 app = Flask(__name__, 
@@ -39,6 +40,29 @@ ALLOWED_EXTENSIONS = {'txt'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 os.makedirs(CONFIG_FOLDER, exist_ok=True)
+
+
+def get_locale():
+    """Get the current user's language, defaulting to Spanish."""
+    return session.get('lang', DEFAULT_LANG)
+
+
+@app.context_processor
+def inject_i18n():
+    lang = get_locale()
+    return {
+        't': get_translator(lang),
+        'lang': lang,
+        'translations_json': TRANSLATIONS.get(lang, TRANSLATIONS[DEFAULT_LANG])
+    }
+
+
+@app.route('/set_language/<lang_code>')
+def set_language(lang_code):
+    """Switch the UI language between Spanish and English"""
+    if lang_code in TRANSLATIONS:
+        session['lang'] = lang_code
+    return redirect(request.referrer or url_for('index'))
 
 # Global state for tracking analysis progress
 analysis_state = {
@@ -73,7 +97,7 @@ def index():
         }
     except:
         existing_config = {
-            'campaign_name': 'Mi campaña',
+            'campaign_name': get_translator(get_locale())('default_campaign_name'),
             'target_brand': '',
             'competitors': '',
             'runs_per_query': 15,
@@ -149,17 +173,19 @@ def configure():
             with open(filepath, 'r', encoding='utf-8') as f:
                 queries = [line.strip() for line in f.readlines() if line.strip()]
         
+        t = get_translator(get_locale())
+
         # Validation
         if not queries:
-            flash('Please provide queries either in the text area or upload a file', 'error')
+            flash(t('flash_missing_queries'), 'error')
             return redirect(url_for('index'))
-        
+
         if not target_brand:
-            flash('Please specify a target brand', 'error')
+            flash(t('flash_missing_brand'), 'error')
             return redirect(url_for('index'))
-        
+
         if not any(platforms.values()):
-            flash('Please select at least one platform', 'error')
+            flash(t('flash_missing_platform'), 'error')
             return redirect(url_for('index'))
         
         # Create config
@@ -234,14 +260,14 @@ def configure():
             print(f"[CONFIG SUCCESS] Campaign: '{verified_name}' | Brand: '{verified_brand}' | Queries: {len(verified_queries)}")
             print(f"[CONFIG SAVE] ========================================")
 
-        success_msg = f'Configuration saved! Ready to analyze {len(queries)} queries across {sum(platforms.values())} platforms'
+        success_msg = t('flash_config_saved', n=len(queries), p=sum(platforms.values()))
         print(f"[CONFIG SAVE] {success_msg}")
         flash(success_msg, 'success')
         return redirect(url_for('run'))
-        
+
     except Exception as e:
-        flash(f'Error saving configuration: {str(e)}', 'error')
-        return redirect(url_for('index'))    
+        flash(get_translator(get_locale())('flash_error_saving', e=str(e)), 'error')
+        return redirect(url_for('index'))
     
 
 @app.route('/run')
@@ -544,7 +570,7 @@ def download(filename):
         response.headers['Expires'] = '0'
         return response
     else:
-        flash('Archivo no encontrado', 'error')
+        flash(get_translator(get_locale())('flash_file_not_found'), 'error')
         return redirect(url_for('results'))
 
 
@@ -552,12 +578,13 @@ def download(filename):
 def delete_report(filename):
     """Delete a report file"""
     filepath = _safe_output_path(filename)
+    t = get_translator(get_locale())
 
     if filepath and os.path.exists(filepath):
         os.remove(filepath)
-        flash(f'Informe eliminado: {os.path.basename(filepath)}', 'success')
+        flash(t('flash_report_deleted', name=os.path.basename(filepath)), 'success')
     else:
-        flash('Archivo no encontrado', 'error')
+        flash(t('flash_file_not_found'), 'error')
     return redirect(url_for('results'))
 
 

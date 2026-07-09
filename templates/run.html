@@ -1,25 +1,25 @@
 {% extends "layout.html" %}
 
-{% block title %}Ejecutar análisis · Geoco{% endblock %}
+{% block title %}{{ t('run_title') }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>▶️ Ejecutar análisis</h2>
-    <p>Monitorea el progreso de tu análisis en tiempo real</p>
+    <h2>{{ t('run_header') }}</h2>
+    <p>{{ t('run_subheader') }}</p>
 </div>
 
 <div class="run-container">
     <div id="status-panel" class="status-panel">
         <div class="status-item">
-            <span class="status-label">⚡ Estado</span>
-            <span id="status" class="status-value">Listo</span>
+            <span class="status-label">{{ t('status_label') }}</span>
+            <span id="status" class="status-value">{{ t('status_ready') }}</span>
         </div>
         <div class="status-item">
-            <span class="status-label">📊 Progreso</span>
+            <span class="status-label">{{ t('progress_label') }}</span>
             <span id="progress" class="status-value">0 / 0</span>
         </div>
         <div class="status-item">
-            <span class="status-label">⏱️ Tiempo restante</span>
+            <span class="status-label">{{ t('eta_label') }}</span>
             <span id="eta" class="status-value">—</span>
         </div>
     </div>
@@ -30,41 +30,42 @@
 
     {% if current_config %}
     <div class="config-preview">
-        <h4>📋 Configuración actual</h4>
+        <h4>{{ t('config_preview_title') }}</h4>
         <div class="preview-grid">
-            <span class="preview-pill"><strong>Campaña:</strong> {{ current_config.campaign_name }}</span>
-            <span class="preview-pill"><strong>Marca objetivo:</strong> {{ current_config.target_brand }}</span>
-            <span class="preview-pill"><strong>Consultas:</strong> {{ current_config.query_count }}</span>
+            <span class="preview-pill"><strong>{{ t('preview_campaign') }}</strong> {{ current_config.campaign_name }}</span>
+            <span class="preview-pill"><strong>{{ t('preview_target_brand') }}</strong> {{ current_config.target_brand }}</span>
+            <span class="preview-pill"><strong>{{ t('preview_queries') }}</strong> {{ current_config.query_count }}</span>
         </div>
         <div class="preview-note">
-            ⚠️ Esto es lo que se analizará al iniciar. Si algo es incorrecto, ve a <a href="{{ url_for('index') }}">Configurar</a> y guarda tus cambios.
+            {{ t('preview_note_pre') }}<a href="{{ url_for('index') }}">{{ t('nav_configure') }}</a>{{ t('preview_note_post') }}
         </div>
     </div>
     {% endif %}
 
     <div class="controls">
         <button id="start-btn" class="btn btn-primary btn-large" onclick="startAnalysis()">
-            ▶️ Iniciar análisis
+            {{ t('btn_start_analysis') }}
         </button>
         <button id="stop-btn" class="btn btn-secondary" onclick="stopAnalysis()" style="display:none;">
-            ⏹️ Detener
+            {{ t('btn_stop') }}
         </button>
     </div>
 
     <div class="logs-container">
-        <h3>🖥️ Salida de consola</h3>
-        <div id="logs" class="logs"></div>
+        <h3>{{ t('console_output_title') }}</h3>
+        <div id="logs" class="logs" data-empty-label="{{ t('logs_placeholder') }}"></div>
     </div>
 
     <div id="complete-panel" class="complete-panel" style="display:none;">
-        <h3>✅ ¡Análisis completado!</h3>
-        <p>Tu informe está listo para descargar.</p>
-        <a id="download-link" href="#" class="btn btn-primary">📥 Descargar informe</a>
-        <a href="{{ url_for('results') }}" class="btn btn-secondary">Ver todos los resultados</a>
+        <h3>{{ t('complete_title') }}</h3>
+        <p>{{ t('complete_body') }}</p>
+        <a id="download-link" href="#" class="btn btn-primary">{{ t('btn_download_report') }}</a>
+        <a href="{{ url_for('results') }}" class="btn btn-secondary">{{ t('link_view_all_results') }}</a>
     </div>
 </div>
 
 <script>
+const I18N = {{ translations_json | tojson }};
 let statusInterval = null;
 
 function startAnalysis() {
@@ -92,22 +93,22 @@ function startAnalysis() {
 
             document.getElementById('start-btn').style.display = 'none';
             document.getElementById('stop-btn').style.display = 'inline-flex';
-            document.getElementById('status').textContent = 'Ejecutando…';
+            document.getElementById('status').textContent = I18N.js_status_running;
 
             // Start polling for status
             statusInterval = setInterval(updateStatus, 2000);
         })
         .catch(error => {
-            alert('Error al iniciar el análisis: ' + error);
+            alert(I18N.js_error_starting + error);
         });
 }
 
 function stopAnalysis() {
-    if (confirm('¿Seguro que deseas detener el análisis?')) {
+    if (confirm(I18N.js_confirm_stop)) {
         clearInterval(statusInterval);
         document.getElementById('start-btn').style.display = 'inline-flex';
         document.getElementById('stop-btn').style.display = 'none';
-        document.getElementById('status').textContent = 'Detenido';
+        document.getElementById('status').textContent = I18N.js_status_stopped;
     }
 }
 
@@ -143,7 +144,7 @@ function updateStatus() {
                 clearInterval(statusInterval);
                 statusInterval = null;  // Clear the reference
 
-                document.getElementById('status').textContent = '¡Completado!';
+                document.getElementById('status').textContent = I18N.js_status_complete;
                 document.getElementById('start-btn').style.display = 'inline-flex';
                 document.getElementById('stop-btn').style.display = 'none';
 
@@ -165,8 +166,8 @@ function updateStatus() {
             if (data.error) {
                 clearInterval(statusInterval);
                 statusInterval = null;
-                document.getElementById('status').textContent = '¡Error!';
-                alert('Error: ' + data.error);
+                document.getElementById('status').textContent = I18N.js_status_error;
+                alert(I18N.js_error_prefix + data.error);
             }
         })
         .catch(error => {
@@ -186,7 +187,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
             // If server says not running, ensure UI reflects that
             if (!data.running) {
-                document.getElementById('status').textContent = 'Listo';
+                document.getElementById('status').textContent = I18N.status_ready;
                 document.getElementById('start-btn').style.display = 'inline-flex';
                 document.getElementById('stop-btn').style.display = 'none';
 

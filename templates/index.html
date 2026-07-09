@@ -1,143 +1,143 @@
 {% extends "layout.html" %}
 
-{% block title %}Configurar · Geoco{% endblock %}
+{% block title %}{{ t('index_title') }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>📋 Configurar análisis</h2>
-    <p>Define tu campaña de monitoreo de marca</p>
+    <h2>{{ t('index_header') }}</h2>
+    <p>{{ t('index_subheader') }}</p>
 </div>
 
 <form method="POST" action="{{ url_for('configure') }}" enctype="multipart/form-data" class="config-form">
 
     <div class="form-section">
-        <h3>Detalles de la campaña</h3>
+        <h3>{{ t('section_campaign_details') }}</h3>
 
         <div class="form-group">
-            <label for="campaign_name">Nombre de la campaña</label>
+            <label for="campaign_name">{{ t('label_campaign_name') }}</label>
             <input type="text" id="campaign_name" name="campaign_name" value="" required
-                placeholder="Ej.: Campaña Verano 2026">
+                placeholder="{{ t('placeholder_campaign_name') }}">
         </div>
 
         <div class="form-group">
-            <label for="target_brand">Marca objetivo <span class="req">*</span></label>
+            <label for="target_brand">{{ t('label_target_brand') }} <span class="req">*</span></label>
             <input type="text" id="target_brand" name="target_brand" value="" required
-                placeholder="Ej.: Dr Martens">
+                placeholder="{{ t('placeholder_target_brand') }}">
         </div>
 
         <div class="form-group">
-            <label for="competitors">Competidores <small style="display:inline">(separados por comas)</small></label>
+            <label for="competitors">{{ t('label_competitors') }} <small style="display:inline">{{ t('hint_comma_separated') }}</small></label>
             <textarea id="competitors" name="competitors" rows="3"
-                placeholder="Ej.: Birkenstock, UGG, Crocs, Teva, Keen"></textarea>
+                placeholder="{{ t('placeholder_competitors') }}"></textarea>
         </div>
     </div>
 
     <div class="form-section">
-        <h3>Modelos / Productos <small style="display:inline; font-weight:500; color:var(--muted)">(opcional)</small></h3>
+        <h3>{{ t('section_models') }} <small style="display:inline; font-weight:500; color:var(--muted)">{{ t('optional_label') }}</small></h3>
 
         <div class="form-group">
-            <label for="models">Modelos de producto <small style="display:inline">(separados por comas)</small></label>
+            <label for="models">{{ t('label_models') }} <small style="display:inline">{{ t('hint_comma_separated') }}</small></label>
             <textarea id="models" name="models" rows="3"
-                placeholder="Ej.: Blaire, Gryphon, Myles, Terry (sandalias Dr Martens)"></textarea>
-            <small>Lista nombres o modelos específicos para rastrear sus menciones.</small>
+                placeholder="{{ t('placeholder_models') }}"></textarea>
+            <small>{{ t('hint_models') }}</small>
         </div>
     </div>
 
     <div class="form-section">
-        <h3>Mensajes clave a rastrear</h3>
-        <p class="section-hint">Edita los nombres de las categorías — aparecerán como columnas en tu informe.</p>
+        <h3>{{ t('section_keywords') }}</h3>
+        <p class="section-hint">{{ t('hint_keywords') }}</p>
 
         <div class="cat-block">
             <div class="form-group">
-                <label for="category_name_1">Nombre de la categoría 1</label>
+                <label for="category_name_1">{{ t('label_category_name') }} 1</label>
                 <input type="text" id="category_name_1" name="category_name_1" value=""
-                    placeholder="Ej.: Comodidad, Sostenibilidad">
+                    placeholder="{{ t('placeholder_cat1_name') }}">
             </div>
             <div class="form-group">
-                <label for="keywords_1">Palabras clave de la categoría 1 <small style="display:inline">(separadas por comas)</small></label>
+                <label for="keywords_1">{{ t('label_category_keywords') }} 1 <small style="display:inline">{{ t('hint_comma_separated') }}</small></label>
                 <input type="text" id="keywords_1" name="keywords_1"
-                    placeholder="Ej.: cómodo, acolchado, suave"
+                    placeholder="{{ t('placeholder_cat1_kw') }}"
                     value="">
             </div>
         </div>
 
         <div class="cat-block">
             <div class="form-group">
-                <label for="category_name_2">Nombre de la categoría 2</label>
+                <label for="category_name_2">{{ t('label_category_name') }} 2</label>
                 <input type="text" id="category_name_2" name="category_name_2" value=""
-                    placeholder="Ej.: Calidad, Manufactura">
+                    placeholder="{{ t('placeholder_cat2_name') }}">
             </div>
             <div class="form-group">
-                <label for="keywords_2">Palabras clave de la categoría 2 <small style="display:inline">(separadas por comas)</small></label>
-                <input type="text" id="keywords_2" name="keywords_2" placeholder="Ej.: calidad, durable, bien hecho"
+                <label for="keywords_2">{{ t('label_category_keywords') }} 2 <small style="display:inline">{{ t('hint_comma_separated') }}</small></label>
+                <input type="text" id="keywords_2" name="keywords_2" placeholder="{{ t('placeholder_cat2_kw') }}"
                     value="">
             </div>
         </div>
 
         <div class="cat-block">
             <div class="form-group">
-                <label for="category_name_3">Nombre de la categoría 3</label>
+                <label for="category_name_3">{{ t('label_category_name') }} 3</label>
                 <input type="text" id="category_name_3" name="category_name_3" value=""
-                    placeholder="Ej.: Durabilidad, Longevidad">
+                    placeholder="{{ t('placeholder_cat3_name') }}">
             </div>
             <div class="form-group">
-                <label for="keywords_3">Palabras clave de la categoría 3 <small style="display:inline">(separadas por comas)</small></label>
-                <input type="text" id="keywords_3" name="keywords_3" placeholder="Ej.: duradero, resistente, aguanta"
+                <label for="keywords_3">{{ t('label_category_keywords') }} 3 <small style="display:inline">{{ t('hint_comma_separated') }}</small></label>
+                <input type="text" id="keywords_3" name="keywords_3" placeholder="{{ t('placeholder_cat3_kw') }}"
                     value="">
             </div>
         </div>
 
         <div class="cat-block">
             <div class="form-group">
-                <label for="category_name_4">Nombre de la categoría 4</label>
+                <label for="category_name_4">{{ t('label_category_name') }} 4</label>
                 <input type="text" id="category_name_4" name="category_name_4" value=""
-                    placeholder="Ej.: Estilo, Moda">
+                    placeholder="{{ t('placeholder_cat4_name') }}">
             </div>
             <div class="form-group">
-                <label for="keywords_4">Palabras clave de la categoría 4 <small style="display:inline">(separadas por comas)</small></label>
-                <input type="text" id="keywords_4" name="keywords_4" placeholder="Ej.: con estilo, moderno, a la moda"
+                <label for="keywords_4">{{ t('label_category_keywords') }} 4 <small style="display:inline">{{ t('hint_comma_separated') }}</small></label>
+                <input type="text" id="keywords_4" name="keywords_4" placeholder="{{ t('placeholder_cat4_kw') }}"
                     value="">
             </div>
         </div>
     </div>
 
     <div class="form-section">
-        <h3>Consultas</h3>
+        <h3>{{ t('section_queries') }}</h3>
 
         <div class="form-group">
-            <label for="queries_text">Ingresa las consultas <small style="display:inline">(una por línea)</small></label>
+            <label for="queries_text">{{ t('label_queries_text') }} <small style="display:inline">{{ t('hint_one_per_line') }}</small></label>
             <textarea id="queries_text" name="queries_text" rows="10"
-                placeholder="¿Son cómodas las sandalias Dr Martens?&#10;¿Las sandalias Dr Martens necesitan ablandarse?&#10;¿Las sandalias Dr Martens tallan bien?"></textarea>
+                placeholder="{{ t('placeholder_queries') }}"></textarea>
         </div>
 
         <div class="form-group">
-            <label for="queries_file">O sube un archivo de consultas (.txt)</label>
+            <label for="queries_file">{{ t('label_queries_file') }}</label>
             <input type="file" id="queries_file" name="queries_file" accept=".txt">
-            <small>Sube un archivo .txt con una consulta por línea.</small>
+            <small>{{ t('hint_queries_file') }}</small>
         </div>
     </div>
 
     <div class="form-section">
-        <h3>Ajustes del análisis</h3>
+        <h3>{{ t('section_analysis_settings') }}</h3>
 
         <div class="form-group">
-            <label for="runs_per_query">Ejecuciones por consulta:
+            <label for="runs_per_query">{{ t('label_runs_per_query') }}
                 <span class="runs-readout"><span id="runs_value">{{ config.runs_per_query }}</span></span>
             </label>
             <input type="range" id="runs_per_query" name="runs_per_query" min="5" max="100"
                 value="{{ config.runs_per_query }}" step="5">
-            <small>Más ejecuciones = datos más fiables, pero mayor tiempo de procesamiento (15 ejecuciones ≈ 1,7 h para 37 consultas).</small>
+            <small>{{ t('hint_runs') }}</small>
         </div>
 
         <div class="form-group">
-            <label>Plataformas <span class="req">*</span></label>
+            <label>{{ t('label_platforms') }} <span class="req">*</span></label>
             <div class="platform-grid">
                 <label class="platform-card">
                     <input type="checkbox" name="platforms" value="chatgpt" {% if 'chatgpt' in config.platforms %}checked{% endif %}>
                     <span class="pc-check"></span>
                     <span class="pc-body">
                         <span class="pc-name">ChatGPT</span>
-                        <span class="pc-meta">Rápido · ~3s por llamada</span>
+                        <span class="pc-meta">{{ t('platform_speed_chatgpt') }}</span>
                     </span>
                 </label>
                 <label class="platform-card">
@@ -145,7 +145,7 @@
                     <span class="pc-check"></span>
                     <span class="pc-body">
                         <span class="pc-name">Gemini</span>
-                        <span class="pc-meta">Rápido · ~4s por llamada</span>
+                        <span class="pc-meta">{{ t('platform_speed_gemini') }}</span>
                     </span>
                 </label>
                 <label class="platform-card">
@@ -153,7 +153,7 @@
                     <span class="pc-check"></span>
                     <span class="pc-body">
                         <span class="pc-name">Perplexity</span>
-                        <span class="pc-meta">Más lento · ~9s por llamada</span>
+                        <span class="pc-meta">{{ t('platform_speed_perplexity') }}</span>
                     </span>
                 </label>
             </div>
@@ -161,7 +161,7 @@
     </div>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary btn-large">Guardar y continuar →</button>
+        <button type="submit" class="btn btn-primary btn-large">{{ t('btn_save_continue') }}</button>
     </div>
 </form>
 

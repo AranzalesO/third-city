@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{ lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>{% block title %}Geoco · Análisis de Marca con IA{% endblock %}</title>
+    <title>{% block title %}{{ t('layout_title_default') }}{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -25,13 +25,18 @@
                 </span>
                 <span>
                     <span class="brand-name">Geo<span>co</span></span>
-                    <span class="brand-tag">Brand Intelligence</span>
+                    <span class="brand-tag">{{ t('brand_tag') }}</span>
                 </span>
             </a>
             <ul class="nav-links">
-                <li><a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' or request.endpoint == 'configure' %}active{% endif %}">Configurar</a></li>
-                <li><a href="{{ url_for('run') }}" class="{% if request.endpoint == 'run' %}active{% endif %}">Ejecutar análisis</a></li>
-                <li><a href="{{ url_for('results') }}" class="{% if request.endpoint == 'results' %}active{% endif %}">Resultados</a></li>
+                <li><a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' or request.endpoint == 'configure' %}active{% endif %}">{{ t('nav_configure') }}</a></li>
+                <li><a href="{{ url_for('run') }}" class="{% if request.endpoint == 'run' %}active{% endif %}">{{ t('nav_run') }}</a></li>
+                <li><a href="{{ url_for('results') }}" class="{% if request.endpoint == 'results' %}active{% endif %}">{{ t('nav_results') }}</a></li>
+                <li class="lang-switch">
+                    <a href="{{ url_for('set_language', lang_code='es') }}" class="{% if lang == 'es' %}active{% endif %}">ES</a>
+                    <span class="lang-divider">/</span>
+                    <a href="{{ url_for('set_language', lang_code='en') }}" class="{% if lang == 'en' %}active{% endif %}">EN</a>
+                </li>
             </ul>
         </div>
     </nav>
@@ -49,7 +54,7 @@
     </div>
 
     <footer>
-        <p><strong>Geoco</strong> · Análisis de Marca Multiplataforma con IA</p>
+        <p><strong>Geoco</strong> · {{ t('footer_tagline') }}</p>
     </footer>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>

@@ -166,6 +166,40 @@ body {
     box-shadow: inset 0 0 0 1px rgba(165, 180, 252, .35);
 }
 
+.lang-switch {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding-left: 12px;
+    border-left: 1px solid rgba(255, 255, 255, .14);
+}
+
+.lang-switch a {
+    color: rgba(255, 255, 255, .5);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: .78rem;
+    letter-spacing: .04em;
+    padding: 4px 8px;
+    border-radius: var(--r-pill);
+    transition: all .2s ease;
+}
+
+.lang-switch a:hover {
+    color: #fff;
+}
+
+.lang-switch a.active {
+    color: #fff;
+    background: rgba(99, 102, 241, .28);
+}
+
+.lang-divider {
+    color: rgba(255, 255, 255, .25);
+    font-size: .78rem;
+}
+
 /* ============================================================
    Page header
    ============================================================ */
@@ -643,7 +677,7 @@ input[type="range"]::-moz-range-thumb {
 .logs::-webkit-scrollbar { width: 10px; }
 .logs::-webkit-scrollbar-thumb { background: #2d333b; border-radius: var(--r-pill); }
 .logs:empty::before {
-    content: "Esperando para iniciar el análisis…";
+    content: attr(data-empty-label);
     color: #56606b;
 }
 .logs > div {
