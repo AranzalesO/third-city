@@ -61,6 +61,7 @@ class QueryProcessor:
             
             # Check if response is valid
             if not response or len(response) < 10:
+                error_detail = getattr(client, 'last_error', None) or 'Empty or invalid response'
                 return {
                     'brands': [],
                     'sources': [],
@@ -69,7 +70,7 @@ class QueryProcessor:
                     'sentiment': 'N',
                     'platform': platform,
                     'success': False,
-                    'error': 'Empty or invalid response'
+                    'error': error_detail
                 }
             
             # Analyze response
@@ -106,14 +107,15 @@ class QueryProcessor:
         results = []
         successful_runs = 0
         failed_runs = 0
-        
+        errors_seen = []
+
         platform_start = time.time()
         print(f"    {platform_name}: ", end="", flush=True)
-        
+
         for run in range(runs):
             result = self.process_single_query_run(query, client, query_brands)
             results.append(result)
-            
+
             if result['success']:
                 successful_runs += 1
                 # Only print progress every 5 runs to reduce console spam
@@ -123,18 +125,26 @@ class QueryProcessor:
                 failed_runs += 1
                 if failed_runs <= 3:  # Only show first 3 failures
                     print("✗", end="", flush=True)
-            
+                error_msg = result.get('error')
+                if error_msg and error_msg not in errors_seen:
+                    errors_seen.append(error_msg)
+
             # Reduced rate limiting - faster processing
             if run < runs - 1:  # Don't sleep after last run
                 time.sleep(random.uniform(0.2, 0.5))
-        
+
         platform_time = time.time() - platform_start
         print(f" ({successful_runs}/{runs}) [{platform_time:.1f}s]", flush=True)
-        
+        if errors_seen:
+            for err in errors_seen[:3]:
+                print(f"    ⚠ {platform_name} error: {err[:200]}", flush=True)
+
         # Aggregate results for this platform
         aggregated = self._aggregate_platform_results(query, results, query_brands, successful_runs)
         aggregated['platform'] = platform_name
-        
+        aggregated['errors'] = errors_seen[:3]
+        aggregated['failed_runs'] = failed_runs
+
         return aggregated
     
     def _aggregate_platform_results(self, query: str, results: List[Dict], 
@@ -434,8 +444,17 @@ class QueryProcessor:
                     # Build platform status
                     platform_status = {name: "complete" for name in self.clients.keys()}
 
+                    # Collect deduped error summaries surfaced by this query's runs
+                    platform_errors = {}
+                    for platform_name in self.clients.keys():
+                        platform_list = platform_results.get(platform_name, [])
+                        if idx < len(platform_list):
+                            plat_result = platform_list[idx]
+                            if plat_result and plat_result.get('errors'):
+                                platform_errors[platform_name] = plat_result['errors']
+
                     # Call callback with current progress
-                    progress_callback(query_num, total_queries, eta_minutes, platform_status)
+                    progress_callback(query_num, total_queries, eta_minutes, platform_status, platform_errors)
 
                 # Save checkpoint after each query
                 self._save_checkpoint(checkpoint_file, platform_results, idx)

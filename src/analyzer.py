@@ -7,49 +7,60 @@ from collections import Counter
 from typing import Dict, List, Tuple, Any
 
 
+def _normalize_for_match(text: str) -> str:
+    """Normalize text for brand matching so formatting differences (e.g. the
+    abbreviation period in 'Dr. Martens' vs 'Dr Martens') don't break a
+    substring match. Periods become spaces and whitespace is collapsed."""
+    text = text.lower()
+    text = re.sub(r'\.', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
+
 class BrandAnalyzer:
     """Analyzes LLM responses for brand mentions, sources, models, and key messages"""
-    
+
     def __init__(self, config_manager):
         self.config = config_manager
         self.all_brands = config_manager.get_all_brands()
         self.brand_aliases = config_manager.get_brand_aliases()
         self.keywords = config_manager.get_keywords()
         self.models = config_manager.get_models()
-    
+
     def identify_query_brands(self, query: str) -> List[str]:
         """Identify which brands are explicitly mentioned in the query"""
-        query_lower = query.lower()
+        query_norm = _normalize_for_match(query)
         mentioned_brands = []
-        
+
         for brand in self.all_brands:
             # Check main brand name
-            if brand.lower() in query_lower:
+            if _normalize_for_match(brand) in query_norm:
                 mentioned_brands.append(brand)
                 continue
-            
+
             # Check aliases
             aliases = self.brand_aliases.get(brand, [])
-            if any(alias in query_lower for alias in aliases):
+            if any(_normalize_for_match(alias) in query_norm for alias in aliases):
                 mentioned_brands.append(brand)
-        
+
         return mentioned_brands
-    
+
     def extract_brands_from_response(self, response: str) -> List[str]:
         """Extract mentioned brands from response text - PRESERVING ORDER"""
+        response_norm = _normalize_for_match(response)
         brand_positions = []
-        
+
         for brand in self.all_brands:
             # Find first occurrence of brand name
-            pos = response.lower().find(brand.lower())
+            pos = response_norm.find(_normalize_for_match(brand))
             if pos != -1:
                 brand_positions.append((pos, brand))
                 continue
-            
+
             # Check aliases
             aliases = self.brand_aliases.get(brand, [])
             for alias in aliases:
-                pos = response.lower().find(alias.lower())
+                pos = response_norm.find(_normalize_for_match(alias))
                 if pos != -1:
                     brand_positions.append((pos, brand))
                     break

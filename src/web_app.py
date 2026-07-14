@@ -13,6 +13,14 @@ import time
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
+# Windows consoles default to a legacy codepage (e.g. cp1252) that can't
+# encode the checkmark/emoji characters used in status prints below, which
+# crashes the whole analysis with UnicodeEncodeError before any query runs.
+# Force UTF-8 on stdout/stderr so logging never takes down the pipeline.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, 'reconfigure'):
+        _stream.reconfigure(encoding='utf-8', errors='replace')
+
 # Setup paths
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SRC_DIR)
@@ -432,12 +440,23 @@ def run_analysis_background():
 
         # CRITICAL: Define progress callback to update last_update during long analyses
         # This prevents 10-minute timeout from triggering on large campaigns
-        def update_progress(current_query, total_queries, eta_minutes, platform_status):
+        logged_platform_errors = set()
+
+        def update_progress(current_query, total_queries, eta_minutes, platform_status, platform_errors=None):
             analysis_state['current_query'] = current_query
             analysis_state['total_queries'] = total_queries
             analysis_state['eta_minutes'] = eta_minutes
             analysis_state['platform_status'] = platform_status
             analysis_state['last_update'] = time.time()  # CRITICAL: Keep state fresh
+
+            # Surface real API errors (quota, auth, etc.) in the UI instead of only server console
+            if platform_errors:
+                for platform_name, errors in platform_errors.items():
+                    for err in errors:
+                        dedupe_key = f"{platform_name}:{err}"
+                        if dedupe_key not in logged_platform_errors:
+                            logged_platform_errors.add(dedupe_key)
+                            analysis_state['logs'].append(f"⚠️ {platform_name} error: {err}")
 
         platform_results = processor.process_all_queries(queries, progress_callback=update_progress)
 

@@ -217,7 +217,7 @@ TRANSLATIONS = {
     },
 }
 
-DEFAULT_LANG = 'es'
+DEFAULT_LANG = 'en'
 
 
 def get_translator(lang):

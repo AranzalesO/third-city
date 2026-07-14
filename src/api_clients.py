@@ -32,19 +32,24 @@ class ChatGPTClient(LLMClient):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
         self.client = OpenAI(api_key=self.api_key)
-    
+        self.last_error = None
+
     def query(self, prompt: str, system_prompt: str) -> str:
         try:
-            response = self.client.chat.completions.create(
+            # Use the Responses API with web search so answers cite real,
+            # live sources instead of the plain Chat Completions API, which
+            # has no internet access and can't produce real citations.
+            response = self.client.responses.create(
                 model=self.model,
+                instructions=system_prompt,
+                input=prompt,
                 temperature=0.6,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ]
+                tools=[{"type": "web_search_preview"}]
             )
-            return response.choices[0].message.content
+            self.last_error = None
+            return response.output_text
         except Exception as e:
+            self.last_error = str(e)
             print(f"ChatGPT Error: {e}")
             return ""
     
@@ -61,22 +66,26 @@ class GeminiClient(LLMClient):
         self.model = model
         genai.configure(api_key=self.api_key)
         self.client = genai.GenerativeModel(self.model)
-    
+        self.last_error = None
+
     def query(self, prompt: str, system_prompt: str) -> str:
         try:
             # Combine system and user prompts
             full_prompt = f"{system_prompt}\n\nUser question: {prompt}"
-            
+
             response = self.client.generate_content(full_prompt)
-            
+
             # Check if response has text
             if hasattr(response, 'text') and response.text:
+                self.last_error = None
                 return response.text
             else:
+                self.last_error = "No text in response"
                 print(f"Gemini: No text in response")
                 return ""
-                
+
         except Exception as e:
+            self.last_error = str(e)
             print(f"Gemini Error: {e}")
             return ""
     
@@ -91,14 +100,15 @@ class PerplexityClient(LLMClient):
         self.api_key = api_key or os.getenv("PERPLEXITY_API_KEY")
         self.model = model
         self.base_url = "https://api.perplexity.ai/chat/completions"
-    
+        self.last_error = None
+
     def query(self, prompt: str, system_prompt: str) -> str:
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
-            
+
             payload = {
                 "model": self.model,
                 "messages": [
@@ -108,30 +118,35 @@ class PerplexityClient(LLMClient):
                 "temperature": 0.6,
                 "max_tokens": 1024
             }
-            
+
             response = requests.post(
-                self.base_url, 
-                json=payload, 
+                self.base_url,
+                json=payload,
                 headers=headers,
                 timeout=30
             )
-            
+
             # Debug: print response details
             if response.status_code != 200:
+                self.last_error = f"HTTP {response.status_code}: {response.text[:200]}"
                 print(f"Perplexity Status Code: {response.status_code}")
                 print(f"Perplexity Response: {response.text}")
                 return ""
-            
+
             result = response.json()
+            self.last_error = None
             return result["choices"][0]["message"]["content"]
-            
+
         except requests.exceptions.RequestException as e:
+            self.last_error = str(e)
             print(f"Perplexity Request Error: {e}")
             return ""
         except KeyError as e:
+            self.last_error = f"Unexpected response format: missing {e}"
             print(f"Perplexity Response Format Error: {e}")
             return ""
         except Exception as e:
+            self.last_error = str(e)
             print(f"Perplexity Error: {e}")
             return ""
     
