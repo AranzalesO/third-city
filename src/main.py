@@ -4,6 +4,9 @@ Main Application - Brand Monitoring Tool
 
 import sys
 from datetime import datetime
+from console_setup import configure_utf8_console
+configure_utf8_console()
+
 from config_manager import ConfigManager
 from query_processor import QueryProcessor
 from report_generator import ReportGenerator

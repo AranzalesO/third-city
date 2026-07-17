@@ -106,6 +106,18 @@ class ConfigManager:
     def get_runs_per_query(self) -> int:
         """Get number of runs per query"""
         return self.config['runs_per_query']
+
+    def get_run_concurrency(self) -> int:
+        """How many runs of a query to execute concurrently per platform.
+
+        Higher = faster, but more likely to hit provider rate limits (which are
+        retried with backoff, so overshooting costs time rather than data).
+        """
+        value = os.environ.get('RUN_CONCURRENCY') or self.config.get('run_concurrency', 6)
+        try:
+            return max(1, int(value))
+        except (TypeError, ValueError):
+            return 6
     
     def get_enabled_platforms(self) -> List[str]:
         """Get list of enabled platforms"""

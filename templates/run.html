@@ -28,6 +28,8 @@
         <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
     </div>
 
+    <div id="platform-progress" class="platform-progress"></div>
+
     {% if current_config %}
     <div class="config-preview">
         <h4>{{ t('config_preview_title') }}</h4>
@@ -82,6 +84,7 @@ function startAnalysis() {
     document.getElementById('progress-bar').style.width = '0%';
     document.getElementById('progress').textContent = '0 / 0';
     document.getElementById('eta').textContent = '—';
+    document.getElementById('platform-progress').innerHTML = '';
 
     fetch('/start_analysis', { method: 'POST', cache: 'no-store' })
         .then(response => response.json())
@@ -119,14 +122,32 @@ function updateStatus() {
         .then(data => {
             console.log('Status update:', data);  // Debug logging
 
-            // Update progress
-            const progress = data.total_queries > 0
-                ? Math.round((data.current_query / data.total_queries) * 100)
+            // Progress bar tracks individual runs, not queries, so it moves
+            // continuously instead of freezing until a whole query finishes.
+            const progress = data.total_runs > 0
+                ? Math.round((data.completed_runs / data.total_runs) * 100)
                 : 0;
 
             document.getElementById('progress-bar').style.width = progress + '%';
             document.getElementById('progress').textContent =
                 `${data.current_query} / ${data.total_queries}`;
+
+            // Keep the status text driven by the server, not just set once on click
+            if (data.running) {
+                document.getElementById('status').textContent = I18N.js_status_running;
+            }
+
+            // Per-platform run counts, e.g. "ChatGPT 45/100 · Gemini 60/100"
+            const platformEl = document.getElementById('platform-progress');
+            const statuses = data.platform_status || {};
+            const parts = Object.keys(statuses).map(name => {
+                const value = statuses[name];
+                if (value && typeof value === 'object' && 'completed' in value) {
+                    return `<span class="pp-item"><strong>${name}</strong> ${value.completed}/${value.total}</span>`;
+                }
+                return `<span class="pp-item"><strong>${name}</strong> ${value}</span>`;
+            });
+            platformEl.innerHTML = parts.join('');
 
             // Update ETA
             const etaEl = document.getElementById('eta');
@@ -197,6 +218,16 @@ window.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('progress').textContent = '0 / 0';
                 document.getElementById('progress-bar').style.width = '0%';
                 document.getElementById('eta').textContent = '—';
+                document.getElementById('platform-progress').innerHTML = '';
+            } else {
+                // An analysis is already in flight (page reloaded mid-run, or
+                // reopened in a new tab). Re-attach to it instead of showing a
+                // dead "Ready" page with a Start button.
+                document.getElementById('start-btn').style.display = 'none';
+                document.getElementById('stop-btn').style.display = 'inline-flex';
+                document.getElementById('status').textContent = I18N.js_status_running;
+                updateStatus();
+                statusInterval = setInterval(updateStatus, 2000);
             }
         })
         .catch(error => {

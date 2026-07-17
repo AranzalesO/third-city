@@ -4,10 +4,10 @@ Query Processor - Orchestrates query execution across platforms
 """
 
 import time
-import random
 import re
 import json
 import os
+import threading
 from datetime import datetime
 from typing import List, Dict, Any
 from collections import Counter
@@ -29,6 +29,7 @@ class QueryProcessor:
         self.model_normalizer = ModelNormalizer(brand_models)
         self.clients = self._initialize_clients()
         self.system_prompt = config_manager.get_system_prompt()
+        self.run_concurrency = config_manager.get_run_concurrency()
     
     def _initialize_clients(self):
         """Initialize LLM clients for enabled platforms"""
@@ -98,43 +99,58 @@ class QueryProcessor:
                 'error': error_msg
             }
     
-    def process_query_on_platform(self, query: str, platform_name: str, 
-                                   runs: int = 5) -> Dict[str, Any]:
-        """Process a single query multiple times on a specific platform"""
+    def process_query_on_platform(self, query: str, platform_name: str,
+                                   runs: int = 5, run_callback=None) -> Dict[str, Any]:
+        """Process a single query multiple times on a specific platform.
+
+        Runs execute concurrently: they are independent samples of the same
+        query, so running them one-at-a-time only added wall-clock time. The
+        number of calls, model and temperature are unchanged.
+        """
         client = self.clients[platform_name]
         query_brands = self.analyzer.identify_query_brands(query)
-        
+
         results = []
-        successful_runs = 0
-        failed_runs = 0
         errors_seen = []
+        completed = 0
+        lock = threading.Lock()
 
         platform_start = time.time()
-        print(f"    {platform_name}: ", end="", flush=True)
 
-        for run in range(runs):
-            result = self.process_single_query_run(query, client, query_brands)
-            results.append(result)
+        with ThreadPoolExecutor(max_workers=self.run_concurrency) as executor:
+            futures = [
+                executor.submit(self.process_single_query_run, query, client, query_brands)
+                for _ in range(runs)
+            ]
 
-            if result['success']:
-                successful_runs += 1
-                # Only print progress every 5 runs to reduce console spam
-                if (run + 1) % 5 == 0 or run == runs - 1:
-                    print(f"✓", end="", flush=True)
-            else:
-                failed_runs += 1
-                if failed_runs <= 3:  # Only show first 3 failures
-                    print("✗", end="", flush=True)
-                error_msg = result.get('error')
-                if error_msg and error_msg not in errors_seen:
-                    errors_seen.append(error_msg)
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                except Exception as e:
+                    result = {
+                        'brands': [], 'sources': [], 'models': [],
+                        'key_messages': {}, 'sentiment': 'NEU',
+                        'platform': platform_name, 'success': False,
+                        'error': str(e)[:200]
+                    }
 
-            # Reduced rate limiting - faster processing
-            if run < runs - 1:  # Don't sleep after last run
-                time.sleep(random.uniform(0.2, 0.5))
+                with lock:
+                    results.append(result)
+                    completed += 1
+
+                    if not result['success']:
+                        error_msg = result.get('error')
+                        if error_msg and error_msg not in errors_seen:
+                            errors_seen.append(error_msg)
+
+                    if run_callback:
+                        run_callback(platform_name, completed, runs)
+
+        successful_runs = sum(1 for r in results if r['success'])
+        failed_runs = len(results) - successful_runs
 
         platform_time = time.time() - platform_start
-        print(f" ({successful_runs}/{runs}) [{platform_time:.1f}s]", flush=True)
+        print(f"    {platform_name}: ({successful_runs}/{runs}) [{platform_time:.1f}s]", flush=True)
         if errors_seen:
             for err in errors_seen[:3]:
                 print(f"    ⚠ {platform_name} error: {err[:200]}", flush=True)
@@ -327,7 +343,8 @@ class QueryProcessor:
             print(f"\n⚠ Warning: Could not load checkpoint: {e}")
             return None, 0
     
-    def process_all_queries(self, queries: List[str], progress_callback=None) -> Dict[str, List[Dict[str, Any]]]:
+    def process_all_queries(self, queries: List[str], progress_callback=None,
+                            run_callback=None) -> Dict[str, List[Dict[str, Any]]]:
         """Process all queries across all platforms - returns results per platform"""
         total_queries = len(queries)
         runs_per_query = self.config.get_runs_per_query()
@@ -348,7 +365,7 @@ class QueryProcessor:
         print(f"Runs per query per platform: {runs_per_query}")
         print(f"Platforms: {', '.join(self.clients.keys())}")
         print(f"Total API calls: {total_queries * runs_per_query * len(self.clients)}")
-        print(f"⚡ PARALLEL MODE: Processing all platforms simultaneously")
+        print(f"⚡ PARALLEL MODE: {len(self.clients)} platforms x {self.run_concurrency} concurrent runs each")
         if start_query > 0:
             print(f"Starting from query: {start_query + 1}/{total_queries}")
         print("=" * 80)
@@ -382,10 +399,11 @@ class QueryProcessor:
                     # Submit all platforms at once
                     for platform_name in self.clients.keys():
                         future = executor.submit(
-                            self.process_query_on_platform, 
-                            query, 
-                            platform_name, 
-                            runs_per_query
+                            self.process_query_on_platform,
+                            query,
+                            platform_name,
+                            runs_per_query,
+                            run_callback
                         )
                         platform_futures[future] = platform_name
                     

@@ -13,20 +13,15 @@ import time
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
-# Windows consoles default to a legacy codepage (e.g. cp1252) that can't
-# encode the checkmark/emoji characters used in status prints below, which
-# crashes the whole analysis with UnicodeEncodeError before any query runs.
-# Force UTF-8 on stdout/stderr so logging never takes down the pipeline.
-for _stream in (sys.stdout, sys.stderr):
-    if hasattr(_stream, 'reconfigure'):
-        _stream.reconfigure(encoding='utf-8', errors='replace')
-
 # Setup paths
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SRC_DIR)
 sys.path.insert(0, SRC_DIR)
 
 # Import our modules (without src. prefix since we added SRC_DIR to path)
+from console_setup import configure_utf8_console
+configure_utf8_console()
+
 from config_manager import ConfigManager
 from query_processor import QueryProcessor
 from report_generator import ReportGenerator
@@ -72,17 +67,31 @@ def set_language(lang_code):
         session['lang'] = lang_code
     return redirect(request.referrer or url_for('index'))
 
+def _fresh_analysis_state(running=False, logs=None):
+    """A pristine progress state.
+
+    Used for the initial value and every reset so /status always returns the
+    same shape. NOTE: this lives in process memory, so gunicorn must run a
+    single worker (see Procfile) or status polls hit a worker that never saw
+    the analysis start and report 0/0 forever.
+    """
+    return {
+        'running': running,
+        'current_query': 0,
+        'total_queries': 0,
+        'completed_runs': 0,
+        'total_runs': 0,
+        'platform_status': {},
+        'eta_minutes': 0,
+        'logs': logs if logs is not None else [],
+        'error': None,
+        'report_file': None,
+        'last_update': time.time()
+    }
+
+
 # Global state for tracking analysis progress
-analysis_state = {
-    'running': False,
-    'current_query': 0,
-    'total_queries': 0,
-    'platform_status': {},
-    'eta_minutes': 0,
-    'logs': [],
-    'error': None,
-    'report_file': None
-}
+analysis_state = _fresh_analysis_state()
 
 
 def allowed_file(filename):
@@ -315,17 +324,7 @@ def run():
         # If last update was more than 6 hours ago, reset state (handles very long campaigns)
         if current_time - last_update > 2160000:  # 6 hours (was 10 min, too aggressive)
             print(f"[RUN PAGE] Resetting stale running state (last update {int((current_time - last_update)/60)} min ago)")
-            analysis_state = {
-                'running': False,
-                'current_query': 0,
-                'total_queries': 0,
-                'platform_status': {},
-                'eta_minutes': 0,
-                'logs': [],
-                'error': None,
-                'report_file': None,
-                'last_update': time.time()
-            }
+            analysis_state = _fresh_analysis_state()
 
     return render_template('run.html', current_config=current_config)
 
@@ -358,17 +357,7 @@ def start_analysis():
         print(f"[START ANALYSIS] Note: Old reports preserved in output/ folder - use Results page to manage")
 
     # Always reset state completely for fresh start
-    analysis_state = {
-        'running': True,
-        'current_query': 0,
-        'total_queries': 0,
-        'platform_status': {},
-        'eta_minutes': 0,
-        'logs': [],
-        'error': None,
-        'report_file': None,  # CRITICAL: Ensure this is None for fresh start
-        'last_update': time.time()
-    }
+    analysis_state = _fresh_analysis_state(running=True)
 
     print(f"[START ANALYSIS] State reset complete - report_file is now: {analysis_state.get('report_file')}")
 
@@ -438,15 +427,25 @@ def run_analysis_background():
         analysis_state['last_update'] = time.time()
         processor = QueryProcessor(config)
 
+        runs_per_query = config.get_runs_per_query()
+        platform_count = len(processor.clients)
+        total_runs_overall = len(queries) * runs_per_query * platform_count
+        analysis_state['total_runs'] = total_runs_overall
+        analysis_state['logs'].append(
+            f"Plan: {len(queries)} queries x {runs_per_query} runs x {platform_count} platforms "
+            f"= {total_runs_overall} API calls ({processor.run_concurrency} concurrent per platform)"
+        )
+
         # CRITICAL: Define progress callback to update last_update during long analyses
         # This prevents 10-minute timeout from triggering on large campaigns
         logged_platform_errors = set()
+        run_start_time = time.time()
+        completed_runs = {'total': 0}
+        runs_lock = threading.Lock()
 
         def update_progress(current_query, total_queries, eta_minutes, platform_status, platform_errors=None):
             analysis_state['current_query'] = current_query
             analysis_state['total_queries'] = total_queries
-            analysis_state['eta_minutes'] = eta_minutes
-            analysis_state['platform_status'] = platform_status
             analysis_state['last_update'] = time.time()  # CRITICAL: Keep state fresh
 
             # Surface real API errors (quota, auth, etc.) in the UI instead of only server console
@@ -458,7 +457,34 @@ def run_analysis_background():
                             logged_platform_errors.add(dedupe_key)
                             analysis_state['logs'].append(f"⚠️ {platform_name} error: {err}")
 
-        platform_results = processor.process_all_queries(queries, progress_callback=update_progress)
+        def update_run_progress(platform_name, completed, total):
+            """Called as each individual run finishes, so the UI reflects real
+            progress within a query instead of freezing until the query ends."""
+            with runs_lock:
+                completed_runs['total'] += 1
+                done = completed_runs['total']
+
+            analysis_state['platform_status'][platform_name] = {
+                'completed': completed,
+                'total': total
+            }
+            analysis_state['completed_runs'] = done
+
+            # ETA from actual throughput across every run so far - meaningful
+            # within the first few seconds rather than after the first query.
+            elapsed = time.time() - run_start_time
+            if done > 0 and total_runs_overall > 0:
+                avg_per_run = elapsed / done
+                remaining = max(0, total_runs_overall - done)
+                analysis_state['eta_minutes'] = int((avg_per_run * remaining) / 60)
+
+            analysis_state['last_update'] = time.time()
+
+        platform_results = processor.process_all_queries(
+            queries,
+            progress_callback=update_progress,
+            run_callback=update_run_progress
+        )
 
         # Log summary of results to verify fresh data
         total_results = sum(len(results) for results in platform_results.values())
@@ -524,17 +550,7 @@ def reset_state():
     """Manually reset analysis state - useful for clearing stuck states"""
     global analysis_state
 
-    analysis_state = {
-        'running': False,
-        'current_query': 0,
-        'total_queries': 0,
-        'platform_status': {},
-        'eta_minutes': 0,
-        'logs': ['State manually reset'],
-        'error': None,
-        'report_file': None,
-        'last_update': time.time()
-    }
+    analysis_state = _fresh_analysis_state(logs=['State manually reset'])
 
     return jsonify({'status': 'reset', 'message': 'Analysis state has been reset'})
 
