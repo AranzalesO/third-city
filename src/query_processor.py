@@ -309,11 +309,13 @@ class QueryProcessor:
         most_common = Counter(sentiment_scores).most_common(1)[0][0]
         return most_common  # "POS", "NEG", or "NEU"
     
-    def _save_checkpoint(self, checkpoint_file: str, platform_results: Dict, 
+    def _save_checkpoint(self, checkpoint_file: str, platform_results: Dict,
                         last_completed: int):
         """Save progress checkpoint"""
         try:
-            os.makedirs("output", exist_ok=True)
+            checkpoint_dir = os.path.dirname(checkpoint_file)
+            if checkpoint_dir:
+                os.makedirs(checkpoint_dir, exist_ok=True)
             with open(checkpoint_file, 'w') as f:
                 json.dump({
                     'last_completed_query': last_completed,
@@ -344,15 +346,14 @@ class QueryProcessor:
             return None, 0
     
     def process_all_queries(self, queries: List[str], progress_callback=None,
-                            run_callback=None) -> Dict[str, List[Dict[str, Any]]]:
+                            run_callback=None, checkpoint_file: str = "output/checkpoint.json",
+                            stop_event=None
+                            ) -> Dict[str, List[Dict[str, Any]]]:
         """Process all queries across all platforms - returns results per platform"""
         total_queries = len(queries)
         runs_per_query = self.config.get_runs_per_query()
-        
-        # Checkpoint setup
-        checkpoint_file = "output/checkpoint.json"
-        
-        # Try to load checkpoint
+
+        # Try to load checkpoint (caller passes the absolute, persistent-disk-aware path)
         loaded_results, start_query = self._load_checkpoint(checkpoint_file)
         
         if loaded_results:
@@ -371,9 +372,22 @@ class QueryProcessor:
         print("=" * 80)
         
         start_time = datetime.now()
-        
+        stopped_early = False
+
         try:
             for idx in range(start_query, total_queries):
+                # Stop is checked between queries, not mid-query: in-flight
+                # API calls for the current query are allowed to finish
+                # naturally rather than being force-cancelled, since killing
+                # an HTTP call mid-flight isn't clean and the results would
+                # just be thrown away anyway. The checkpoint already saved
+                # after the previous query means nothing already-completed
+                # is lost either way.
+                if stop_event is not None and stop_event.is_set():
+                    print(f"\n⏸ Stop requested - halting before query {idx + 1}/{total_queries}")
+                    stopped_early = True
+                    break
+
                 query = queries[idx]
                 query_num = idx + 1
                 
@@ -474,21 +488,30 @@ class QueryProcessor:
                     # Call callback with current progress
                     progress_callback(query_num, total_queries, eta_minutes, platform_status, platform_errors)
 
-                # Save checkpoint after each query
-                self._save_checkpoint(checkpoint_file, platform_results, idx)
+                # Save checkpoint after each query. Store idx + 1 (count of
+                # completed queries), not idx itself -- _load_checkpoint's
+                # start_query is used directly as the next loop index, so
+                # saving the just-completed idx would reprocess that query
+                # on every resume.
+                self._save_checkpoint(checkpoint_file, platform_results, idx + 1)
                 
         except KeyboardInterrupt:
             print("\n\n⚠ Process interrupted by user")
             print(f"Progress saved. Run again to resume from query {idx + 1}")
             raise
-        
-        # Clean up checkpoint file on successful completion
-        try:
-            if os.path.exists(checkpoint_file):
-                os.remove(checkpoint_file)
-                print("\n✓ Checkpoint file cleaned up")
-        except:
-            pass
+
+        if stopped_early:
+            # Checkpoint intentionally left in place -- this is what makes
+            # "Resume" on the Run page possible after a user-requested stop.
+            print(f"\n⏸ Stopped by user - checkpoint preserved for resume")
+        else:
+            # Clean up checkpoint file on successful completion
+            try:
+                if os.path.exists(checkpoint_file):
+                    os.remove(checkpoint_file)
+                    print("\n✓ Checkpoint file cleaned up")
+            except:
+                pass
         
         total_time = (datetime.now() - start_time).total_seconds()
         

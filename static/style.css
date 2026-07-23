@@ -668,6 +668,27 @@ input[type="range"]::-moz-range-thumb {
 }
 .preview-note a { color: var(--primary-600); font-weight: 600; }
 
+/* Resume banner - shown when a checkpoint from an interrupted run exists */
+.resume-banner {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--r-md);
+    padding: 1.1rem 1.4rem;
+    margin: 0 0 1.5rem;
+}
+.resume-banner h4 {
+    margin-bottom: .4rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #92400e;
+}
+.resume-banner p {
+    font-size: .88rem;
+    color: #92400e;
+    line-height: 1.5;
+    margin: 0;
+}
+
 .controls {
     text-align: center;
     margin-bottom: 2rem;

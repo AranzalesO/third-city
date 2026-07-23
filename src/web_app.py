@@ -34,10 +34,15 @@ app = Flask(__name__,
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 CORS(app)
 
-# Configuration - Use absolute paths
-UPLOAD_FOLDER = os.path.join(PROJECT_ROOT, 'uploads')
-OUTPUT_FOLDER = os.path.join(PROJECT_ROOT, 'output')
-CONFIG_FOLDER = os.path.join(PROJECT_ROOT, 'config')
+# Configuration - Use absolute paths.
+# DATA_DIR defaults to the project root (today's behavior, ephemeral on most
+# hosts). In production, point it at a mounted persistent disk -- e.g. on
+# Render, attach a Persistent Disk and set DATA_DIR to its mount path -- so
+# campaign config, reports and the resume checkpoint all survive restarts.
+DATA_DIR = os.environ.get('DATA_DIR', PROJECT_ROOT)
+UPLOAD_FOLDER = os.path.join(DATA_DIR, 'uploads')
+OUTPUT_FOLDER = os.path.join(DATA_DIR, 'output')
+CONFIG_FOLDER = os.path.join(DATA_DIR, 'config')
 ALLOWED_EXTENSIONS = {'txt'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -85,6 +90,7 @@ def _fresh_analysis_state(running=False, logs=None):
         'eta_minutes': 0,
         'logs': logs if logs is not None else [],
         'error': None,
+        'stopped': False,
         'report_file': None,
         'last_update': time.time()
     }
@@ -92,6 +98,11 @@ def _fresh_analysis_state(running=False, logs=None):
 
 # Global state for tracking analysis progress
 analysis_state = _fresh_analysis_state()
+
+# Signals a running background analysis to stop between queries (see
+# process_all_queries's stop_event check). Same single-worker assumption as
+# analysis_state -- this only works because Procfile runs one gunicorn worker.
+stop_requested = threading.Event()
 
 
 def allowed_file(filename):
@@ -316,6 +327,25 @@ def run():
     except Exception as e:
         current_config = {'error': str(e)}
 
+    # A checkpoint on disk means a previous run was interrupted (server
+    # restart, redeploy, crash) before finishing. analysis_state itself
+    # can't tell us this -- it lives in process memory and resets to
+    # "Ready" on restart -- so this is checked independently, straight
+    # from disk, regardless of what analysis_state currently says.
+    resumable = None
+    if not analysis_state.get('running', False):
+        checkpoint_path = os.path.join(OUTPUT_FOLDER, 'checkpoint.json')
+        if os.path.exists(checkpoint_path):
+            try:
+                with open(checkpoint_path, 'r') as f:
+                    checkpoint = json.load(f)
+                resumable = {
+                    'completed_queries': checkpoint.get('last_completed_query', 0),
+                    'timestamp': checkpoint.get('timestamp', 'unknown')
+                }
+            except Exception as e:
+                print(f"[RUN PAGE] Could not read checkpoint for resume banner: {e}")
+
     # Check for stale running state
     if analysis_state.get('running'):
         current_time = time.time()
@@ -326,7 +356,7 @@ def run():
             print(f"[RUN PAGE] Resetting stale running state (last update {int((current_time - last_update)/60)} min ago)")
             analysis_state = _fresh_analysis_state()
 
-    return render_template('run.html', current_config=current_config)
+    return render_template('run.html', current_config=current_config, resumable=resumable)
 
 
 @app.route('/start_analysis', methods=['POST'])
@@ -356,19 +386,46 @@ def start_analysis():
         print(f"[START ANALYSIS] Clearing old report reference: {old_report}")
         print(f"[START ANALYSIS] Note: Old reports preserved in output/ folder - use Results page to manage")
 
+    payload = request.get_json(silent=True) or {}
+    resume = bool(payload.get('resume', False))
+
+    # Clear any stop signal left over from a previous run before starting a new one
+    stop_requested.clear()
+
     # Always reset state completely for fresh start
     analysis_state = _fresh_analysis_state(running=True)
 
-    print(f"[START ANALYSIS] State reset complete - report_file is now: {analysis_state.get('report_file')}")
+    print(f"[START ANALYSIS] State reset complete - resume={resume} - report_file is now: {analysis_state.get('report_file')}")
 
-    thread = threading.Thread(target=run_analysis_background)
+    thread = threading.Thread(target=run_analysis_background, args=(resume,))
     thread.daemon = True
     thread.start()
 
     return jsonify({'status': 'started'})
 
 
-def run_analysis_background():
+@app.route('/stop_analysis', methods=['POST'])
+def stop_analysis():
+    """Signal a running analysis to stop after the current query finishes.
+
+    Not instant: in-flight API calls for the query in progress are allowed
+    to complete rather than force-cancelled (see stop_event handling in
+    query_processor.process_all_queries). Progress up to that point is kept
+    -- both as a partial report and as a checkpoint that "Resume" can pick
+    back up later.
+    """
+    if not analysis_state.get('running', False):
+        return jsonify({'status': 'not_running'})
+
+    stop_requested.set()
+    analysis_state['logs'].append(
+        "⏹️ Stop requested - finishing the current query, no new ones will start..."
+    )
+    analysis_state['last_update'] = time.time()
+    return jsonify({'status': 'stopping'})
+
+
+def run_analysis_background(resume=False):
     """Run the analysis in background"""
     global analysis_state
 
@@ -376,9 +433,21 @@ def run_analysis_background():
         # Update timestamp at start
         analysis_state['last_update'] = time.time()
 
-        # Clear any existing checkpoint to ensure fresh analysis
+        # Only keep an existing checkpoint when the user explicitly chose to
+        # resume. Otherwise clear it, same as before, so a plain "Start
+        # Analysis" always begins fresh.
         checkpoint_file = os.path.join(OUTPUT_FOLDER, 'checkpoint.json')
-        if os.path.exists(checkpoint_file):
+        resumed_completed_queries = 0
+        if resume and os.path.exists(checkpoint_file):
+            try:
+                with open(checkpoint_file, 'r') as f:
+                    resumed_completed_queries = json.load(f).get('last_completed_query', 0)
+                analysis_state['logs'].append(
+                    f"↻ Resuming interrupted run - {resumed_completed_queries} queries already completed"
+                )
+            except Exception as e:
+                analysis_state['logs'].append(f"⚠️ Could not read checkpoint, starting fresh instead: {e}")
+        elif os.path.exists(checkpoint_file):
             os.remove(checkpoint_file)
             analysis_state['logs'].append("Cleared old checkpoint - starting fresh analysis")
 
@@ -440,7 +509,11 @@ def run_analysis_background():
         # This prevents 10-minute timeout from triggering on large campaigns
         logged_platform_errors = set()
         run_start_time = time.time()
-        completed_runs = {'total': 0}
+        # Pre-seed with runs already done before the restart, so a resumed
+        # run's progress bar reflects total work rather than restarting at 0%.
+        already_done_runs = resumed_completed_queries * runs_per_query * platform_count
+        completed_runs = {'total': already_done_runs, 'new_this_session': 0}
+        analysis_state['completed_runs'] = already_done_runs
         runs_lock = threading.Lock()
 
         def update_progress(current_query, total_queries, eta_minutes, platform_status, platform_errors=None):
@@ -462,7 +535,9 @@ def run_analysis_background():
             progress within a query instead of freezing until the query ends."""
             with runs_lock:
                 completed_runs['total'] += 1
+                completed_runs['new_this_session'] += 1
                 done = completed_runs['total']
+                new_done = completed_runs['new_this_session']
 
             analysis_state['platform_status'][platform_name] = {
                 'completed': completed,
@@ -470,11 +545,14 @@ def run_analysis_background():
             }
             analysis_state['completed_runs'] = done
 
-            # ETA from actual throughput across every run so far - meaningful
-            # within the first few seconds rather than after the first query.
+            # ETA from throughput measured in THIS process only (new_done),
+            # not the resumed total (done) -- runs completed before a
+            # restart happened in zero *current* wall-clock time, so mixing
+            # them into the average would understate throughput and produce
+            # a permanently-wrong ETA for the rest of a resumed run.
             elapsed = time.time() - run_start_time
-            if done > 0 and total_runs_overall > 0:
-                avg_per_run = elapsed / done
+            if new_done > 0 and total_runs_overall > 0:
+                avg_per_run = elapsed / new_done
                 remaining = max(0, total_runs_overall - done)
                 analysis_state['eta_minutes'] = int((avg_per_run * remaining) / 60)
 
@@ -483,8 +561,14 @@ def run_analysis_background():
         platform_results = processor.process_all_queries(
             queries,
             progress_callback=update_progress,
-            run_callback=update_run_progress
+            run_callback=update_run_progress,
+            checkpoint_file=checkpoint_file,
+            stop_event=stop_requested
         )
+
+        # process_all_queries doesn't return whether it exited early -- check
+        # the same event it was watching, since this process owns it.
+        was_stopped = stop_requested.is_set()
 
         # Log summary of results to verify fresh data
         total_results = sum(len(results) for results in platform_results.values())
@@ -520,7 +604,16 @@ def run_analysis_background():
             analysis_state['logs'].append(f"⚠️ Warning: Report file not found at {report_file}")
 
         analysis_state['report_file'] = report_file
-        analysis_state['logs'].append(f"✅ Complete! Report: {report_file}")
+        if was_stopped:
+            analysis_state['stopped'] = True
+            analysis_state['logs'].append(
+                f"⏹️ Stopped by user - partial report generated with the queries completed so far: {report_file}"
+            )
+            analysis_state['logs'].append(
+                "   The remaining queries were saved -- come back to this page to Resume."
+            )
+        else:
+            analysis_state['logs'].append(f"✅ Complete! Report: {report_file}")
         analysis_state['last_update'] = time.time()
         analysis_state['running'] = False
 

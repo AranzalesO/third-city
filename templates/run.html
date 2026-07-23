@@ -44,8 +44,33 @@
     </div>
     {% endif %}
 
+    {% if resumable %}
+    <div id="resume-banner" class="resume-banner">
+        <h4>{{ t('resume_banner_title') }}</h4>
+        <p>{{ t('resume_banner_body', completed=resumable.completed_queries, total=current_config.query_count) }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Shown first, above the "start a new run" controls, so a finished
+         report's download link is the immediate focus rather than competing
+         with a Start button for attention right below the progress bar. -->
+    <div id="complete-panel" class="complete-panel" style="display:none;">
+        <h3 id="complete-title">{{ t('complete_title') }}</h3>
+        <p id="complete-body">{{ t('complete_body') }}</p>
+        <a id="download-link" href="#" class="btn btn-primary">{{ t('btn_download_report') }}</a>
+        <a href="{{ url_for('results') }}" class="btn btn-secondary">{{ t('link_view_all_results') }}</a>
+    </div>
+
     <div class="controls">
-        <button id="start-btn" class="btn btn-primary btn-large" onclick="startAnalysis()">
+        {% if resumable %}
+        <button id="resume-btn" class="btn btn-primary btn-large" onclick="startAnalysis(true)">
+            {{ t('btn_resume_analysis') }}
+        </button>
+        <button id="start-fresh-btn" class="btn btn-secondary" onclick="startFresh()">
+            {{ t('btn_start_fresh') }}
+        </button>
+        {% endif %}
+        <button id="start-btn" class="btn btn-primary btn-large" onclick="startAnalysis(false)" {% if resumable %}style="display:none;"{% endif %}>
             {{ t('btn_start_analysis') }}
         </button>
         <button id="stop-btn" class="btn btn-secondary" onclick="stopAnalysis()" style="display:none;">
@@ -57,20 +82,46 @@
         <h3>{{ t('console_output_title') }}</h3>
         <div id="logs" class="logs" data-empty-label="{{ t('logs_placeholder') }}"></div>
     </div>
-
-    <div id="complete-panel" class="complete-panel" style="display:none;">
-        <h3>{{ t('complete_title') }}</h3>
-        <p>{{ t('complete_body') }}</p>
-        <a id="download-link" href="#" class="btn btn-primary">{{ t('btn_download_report') }}</a>
-        <a href="{{ url_for('results') }}" class="btn btn-secondary">{{ t('link_view_all_results') }}</a>
-    </div>
 </div>
 
 <script>
 const I18N = {{ translations_json | tojson }};
 let statusInterval = null;
 
-function startAnalysis() {
+function hideStartControls() {
+    document.getElementById('start-btn').style.display = 'none';
+    const resumeBtn = document.getElementById('resume-btn');
+    const startFreshBtn = document.getElementById('start-fresh-btn');
+    const resumeBanner = document.getElementById('resume-banner');
+    if (resumeBtn) resumeBtn.style.display = 'none';
+    if (startFreshBtn) startFreshBtn.style.display = 'none';
+    if (resumeBanner) resumeBanner.style.display = 'none';
+}
+
+function showStartControls() {
+    // Only one of these is actually rendered server-side depending on
+    // whether a resumable checkpoint exists -- the missing one is just null.
+    const resumeBtn = document.getElementById('resume-btn');
+    const startFreshBtn = document.getElementById('start-fresh-btn');
+    const resumeBanner = document.getElementById('resume-banner');
+    if (resumeBtn) {
+        resumeBtn.style.display = 'inline-flex';
+        startFreshBtn.style.display = 'inline-flex';
+        resumeBanner.style.display = 'block';
+    } else {
+        document.getElementById('start-btn').style.display = 'inline-flex';
+    }
+}
+
+function startFresh() {
+    if (confirm(I18N.confirm_start_fresh)) {
+        startAnalysis(false);
+    }
+}
+
+function startAnalysis(resume) {
+    resume = !!resume;
+
     // CRITICAL: Stop any existing polling interval
     if (statusInterval) {
         clearInterval(statusInterval);
@@ -86,7 +137,12 @@ function startAnalysis() {
     document.getElementById('eta').textContent = '—';
     document.getElementById('platform-progress').innerHTML = '';
 
-    fetch('/start_analysis', { method: 'POST', cache: 'no-store' })
+    fetch('/start_analysis', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume: resume })
+    })
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -94,8 +150,10 @@ function startAnalysis() {
                 return;
             }
 
-            document.getElementById('start-btn').style.display = 'none';
-            document.getElementById('stop-btn').style.display = 'inline-flex';
+            hideStartControls();
+            const stopBtnEl = document.getElementById('stop-btn');
+            stopBtnEl.disabled = false;
+            stopBtnEl.style.display = 'inline-flex';
             document.getElementById('status').textContent = I18N.js_status_running;
 
             // Start polling for status
@@ -107,12 +165,29 @@ function startAnalysis() {
 }
 
 function stopAnalysis() {
-    if (confirm(I18N.js_confirm_stop)) {
-        clearInterval(statusInterval);
-        document.getElementById('start-btn').style.display = 'inline-flex';
-        document.getElementById('stop-btn').style.display = 'none';
-        document.getElementById('status').textContent = I18N.js_status_stopped;
-    }
+    if (!confirm(I18N.js_confirm_stop)) return;
+
+    // Don't clear statusInterval or flip to "ready" here -- the analysis is
+    // still actually running server-side until it finishes the query in
+    // flight. Keep polling so the UI reflects the real transition instead
+    // of lying about being stopped immediately.
+    const stopBtn = document.getElementById('stop-btn');
+    stopBtn.disabled = true;
+    document.getElementById('status').textContent = I18N.js_status_stopping;
+
+    fetch('/stop_analysis', { method: 'POST', cache: 'no-store' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'not_running') {
+                // Already finished on its own before this reached the server
+                stopBtn.disabled = false;
+                updateStatus();
+            }
+        })
+        .catch(error => {
+            stopBtn.disabled = false;
+            alert(I18N.js_error_starting + error);
+        });
 }
 
 function updateStatus() {
@@ -160,14 +235,25 @@ function updateStatus() {
             logsDiv.innerHTML = data.logs.map(log => `<div>${log}</div>`).join('');
             logsDiv.scrollTop = logsDiv.scrollHeight;
 
-            // Check if complete
+            // Check if complete (naturally, or stopped early with partial results)
             if (!data.running && data.report_file) {
                 clearInterval(statusInterval);
                 statusInterval = null;  // Clear the reference
 
-                document.getElementById('status').textContent = I18N.js_status_complete;
-                document.getElementById('start-btn').style.display = 'inline-flex';
-                document.getElementById('stop-btn').style.display = 'none';
+                const stopBtnEl = document.getElementById('stop-btn');
+                stopBtnEl.disabled = false;
+                stopBtnEl.style.display = 'none';
+                showStartControls();
+
+                if (data.stopped) {
+                    document.getElementById('status').textContent = I18N.js_status_stopped;
+                    document.getElementById('complete-title').textContent = I18N.stopped_title;
+                    document.getElementById('complete-body').textContent = I18N.stopped_body;
+                } else {
+                    document.getElementById('status').textContent = I18N.js_status_complete;
+                    document.getElementById('complete-title').textContent = I18N.complete_title;
+                    document.getElementById('complete-body').textContent = I18N.complete_body;
+                }
 
                 // Extract filename from path (handle both / and \)
                 const filename = data.report_file.replace(/\\/g, '/').split('/').pop();
@@ -187,6 +273,7 @@ function updateStatus() {
             if (data.error) {
                 clearInterval(statusInterval);
                 statusInterval = null;
+                document.getElementById('stop-btn').disabled = false;
                 document.getElementById('status').textContent = I18N.js_status_error;
                 alert(I18N.js_error_prefix + data.error);
             }
@@ -209,7 +296,7 @@ window.addEventListener('DOMContentLoaded', function() {
             // If server says not running, ensure UI reflects that
             if (!data.running) {
                 document.getElementById('status').textContent = I18N.status_ready;
-                document.getElementById('start-btn').style.display = 'inline-flex';
+                showStartControls();
                 document.getElementById('stop-btn').style.display = 'none';
 
                 // Clear UI for fresh start
@@ -223,7 +310,7 @@ window.addEventListener('DOMContentLoaded', function() {
                 // An analysis is already in flight (page reloaded mid-run, or
                 // reopened in a new tab). Re-attach to it instead of showing a
                 // dead "Ready" page with a Start button.
-                document.getElementById('start-btn').style.display = 'none';
+                hideStartControls();
                 document.getElementById('stop-btn').style.display = 'inline-flex';
                 document.getElementById('status').textContent = I18N.js_status_running;
                 updateStatus();
