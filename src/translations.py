@@ -54,6 +54,7 @@ TRANSLATIONS = {
         'platform_speed_chatgpt': 'Rápido · ~3s por llamada',
         'platform_speed_gemini': 'Rápido · ~4s por llamada',
         'platform_speed_perplexity': 'Más lento · ~9s por llamada',
+        'platform_speed_claude': 'El más lento · ~20s por llamada · con búsqueda web',
         'btn_save_continue': 'Guardar y continuar →',
 
         # Run page
@@ -168,6 +169,7 @@ TRANSLATIONS = {
         'platform_speed_chatgpt': 'Fast · ~3s per call',
         'platform_speed_gemini': 'Fast · ~4s per call',
         'platform_speed_perplexity': 'Slower · ~9s per call',
+        'platform_speed_claude': 'Slowest · ~20s per call · with web search',
         'btn_save_continue': 'Save and Continue →',
 
         # Run page

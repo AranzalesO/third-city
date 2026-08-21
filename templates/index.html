@@ -156,6 +156,14 @@
                         <span class="pc-meta">{{ t('platform_speed_perplexity') }}</span>
                     </span>
                 </label>
+                <label class="platform-card">
+                    <input type="checkbox" name="platforms" value="claude" {% if 'claude' in config.platforms %}checked{% endif %}>
+                    <span class="pc-check"></span>
+                    <span class="pc-body">
+                        <span class="pc-name">Claude</span>
+                        <span class="pc-meta">{{ t('platform_speed_claude') }}</span>
+                    </span>
+                </label>
             </div>
         </div>
     </div>

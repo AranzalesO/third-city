@@ -129,7 +129,7 @@ def index():
             'target_brand': '',
             'competitors': '',
             'runs_per_query': 15,
-            'platforms': ['chatgpt', 'gemini', 'perplexity']
+            'platforms': ['chatgpt', 'gemini', 'perplexity', 'claude']
         }
 
     return render_template('index.html', config=existing_config)
@@ -179,10 +179,12 @@ def configure():
         runs_per_query = int(request.form.get('runs_per_query', 15))
         
         # Get platform selections
+        selected_platforms = request.form.getlist('platforms')
         platforms = {
-            'chatgpt': 'chatgpt' in request.form.getlist('platforms'),
-            'gemini': 'gemini' in request.form.getlist('platforms'),
-            'perplexity': 'perplexity' in request.form.getlist('platforms')
+            'chatgpt': 'chatgpt' in selected_platforms,
+            'gemini': 'gemini' in selected_platforms,
+            'perplexity': 'perplexity' in selected_platforms,
+            'claude': 'claude' in selected_platforms
         }
         
         # Get queries from text area or file

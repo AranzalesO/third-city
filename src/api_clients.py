@@ -6,6 +6,7 @@ import random
 from abc import ABC, abstractmethod
 from openai import OpenAI
 import google.generativeai as genai
+import anthropic
 import requests
 from dotenv import load_dotenv
 
@@ -23,11 +24,21 @@ FATAL_ERROR_PATTERNS = (
     'incorrect api key',
     'api key not valid',
     'api_key_invalid',
+    'api key is invalid',
     'permission_denied',
+    'permission_error',
     'prepayment credits are depleted',
     'generaterequestsperdayperproject',
+    # Perplexity surfaces auth failures as "HTTP 401: ..."; the OpenAI and
+    # Anthropic SDKs use "Error code: 401 - ...". Both spellings are needed.
     'http 401',
     'http 403',
+    'error code: 401',
+    'error code: 403',
+    'authentication_error',
+    # Raised SDK-side (no HTTP call) when no key is configured at all -- e.g. a
+    # deploy that shipped before its API key env var was set.
+    'could not resolve authentication method',
     'unauthorized',
 )
 
@@ -204,6 +215,97 @@ class PerplexityClient(LLMClient):
         return "Perplexity"
 
 
+class ClaudeClient(LLMClient):
+    """Anthropic Claude API client"""
+
+    def __init__(self, api_key: str = None, model: str = "claude-sonnet-5"):
+        super().__init__()
+        # ANTHROPIC_API_KEY is the SDK's own standard name. CLAUDE_API_KEY is
+        # accepted as a fallback so a deployment still holding the older name
+        # (e.g. an unmigrated Render env var) keeps working.
+        self.api_key = (api_key or os.getenv("ANTHROPIC_API_KEY")
+                        or os.getenv("CLAUDE_API_KEY"))
+        self.model = model
+        # max_retries=0 for the same reason as ChatGPT: _run_with_retry decides
+        # what's worth retrying, so the SDK's silent backoff can't burn ~20s per
+        # doomed call on a permanently failing key.
+        self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=0)
+
+    def query(self, prompt: str, system_prompt: str) -> str:
+        def call():
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[{"role": "user", "content": prompt}],
+                # Simple consumer Q&A -- low effort keeps thinking (and spend)
+                # minimal. Thinking is left on: disabling it on Opus 5 risks the
+                # model writing a tool call into visible text instead of calling
+                # the search tool, which would silently cost us the sources.
+                output_config={"effort": "low"},
+                # Real web search, so Claude cites live sources like ChatGPT and
+                # Perplexity do rather than recalling URLs from training data.
+                # This variant runs code execution internally -- do NOT also
+                # declare a code_execution tool.
+                tools=[{
+                    "type": "web_search_20260209",
+                    "name": "web_search",
+                    "max_uses": 3,
+                }],
+            )
+
+            # A safety refusal returns HTTP 200 with no usable answer. Surface it
+            # as an error rather than letting it look like an empty response.
+            if response.stop_reason == "refusal":
+                details = getattr(response, "stop_details", None)
+                category = getattr(details, "category", None) or "unspecified"
+                raise RuntimeError(f"Model refused to answer (category: {category})")
+
+            return self._extract_text_with_sources(response)
+
+        return self._run_with_retry(call)
+
+    @staticmethod
+    def _extract_text_with_sources(response) -> str:
+        """Join the answer text and append the URLs the search actually used.
+
+        Claude returns cited URLs in structured web_search_tool_result blocks,
+        NOT inside the answer text (verified against the live API). The analyzer
+        scrapes domains out of the response string, so without this the whole
+        'Source(s) Cited' column would be blank for Claude even though the
+        search ran.
+        """
+        text_parts = []
+        urls = []
+
+        def remember(url):
+            if url and url not in urls:
+                urls.append(url)
+
+        for block in response.content:
+            if block.type == "text":
+                text_parts.append(block.text)
+                # Citations may also carry URLs depending on the response.
+                for citation in (getattr(block, "citations", None) or []):
+                    remember(getattr(citation, "url", None))
+            elif block.type == "web_search_tool_result":
+                content = block.content
+                # Success -> list of results; error -> a single error object.
+                if isinstance(content, list):
+                    for result in content:
+                        remember(getattr(result, "url", None))
+
+        text = "".join(text_parts).strip()
+
+        if urls:
+            text += "\n\nSources: " + " ".join(urls)
+
+        return text
+
+    def get_platform_name(self) -> str:
+        return "Claude"
+
+
 class LLMClientFactory:
     """Factory to create LLM clients"""
     
@@ -217,6 +319,8 @@ class LLMClientFactory:
             return GeminiClient()
         elif platform == "perplexity":
             return PerplexityClient()
+        elif platform == "claude":
+            return ClaudeClient()
         else:
             raise ValueError(f"Unknown platform: {platform}")
     
@@ -232,5 +336,7 @@ class LLMClientFactory:
             clients.append(GeminiClient())
         if platforms.get("perplexity", False):
             clients.append(PerplexityClient())
-        
+        if platforms.get("claude", False):
+            clients.append(ClaudeClient())
+
         return clients
