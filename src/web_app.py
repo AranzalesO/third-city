@@ -35,11 +35,47 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 CORS(app)
 
 # Configuration - Use absolute paths.
-# DATA_DIR defaults to the project root (today's behavior, ephemeral on most
-# hosts). In production, point it at a mounted persistent disk -- e.g. on
-# Render, attach a Persistent Disk and set DATA_DIR to its mount path -- so
-# campaign config, reports and the resume checkpoint all survive restarts.
-DATA_DIR = os.environ.get('DATA_DIR', PROJECT_ROOT)
+# DATA_DIR defaults to the project root (ephemeral on most hosts). In
+# production, point it at a mounted persistent disk -- e.g. on Render, attach a
+# Persistent Disk and set DATA_DIR to its mount path -- so campaign config,
+# reports and the resume checkpoint all survive restarts.
+def _resolve_data_dir():
+    """Return a usable data directory, falling back to the project root.
+
+    Setting DATA_DIR to a path that isn't actually writable (the classic case:
+    pointing it at a persistent-disk mount path *before* the disk is attached)
+    used to kill the whole service at import time with a bare PermissionError.
+    Losing persistence is much better than losing the service, so fall back --
+    but shout about it, because silently degrading to ephemeral storage is how
+    you lose reports later without knowing why.
+    """
+    configured = os.environ.get('DATA_DIR')
+    if not configured:
+        return PROJECT_ROOT
+
+    try:
+        os.makedirs(configured, exist_ok=True)
+        # Existing but read-only is just as fatal as missing, so prove we can
+        # actually write before committing to this location.
+        probe = os.path.join(configured, '.geoco_write_test')
+        with open(probe, 'w') as f:
+            f.write('ok')
+        os.remove(probe)
+        return configured
+    except OSError as e:
+        print("=" * 72, flush=True)
+        print(f"[DATA_DIR] WARNING: cannot use DATA_DIR='{configured}' ({e})", flush=True)
+        print(f"[DATA_DIR] Falling back to '{PROJECT_ROOT}' so the app can start.", flush=True)
+        print("[DATA_DIR] Reports, campaign config and resume checkpoints will NOT", flush=True)
+        print("[DATA_DIR] survive a restart or redeploy until this is fixed.", flush=True)
+        print("[DATA_DIR] On Render: attach a Persistent Disk whose Mount Path is", flush=True)
+        print("[DATA_DIR] exactly this DATA_DIR value (requires a paid instance),", flush=True)
+        print("[DATA_DIR] or remove the DATA_DIR env var to silence this warning.", flush=True)
+        print("=" * 72, flush=True)
+        return PROJECT_ROOT
+
+
+DATA_DIR = _resolve_data_dir()
 UPLOAD_FOLDER = os.path.join(DATA_DIR, 'uploads')
 OUTPUT_FOLDER = os.path.join(DATA_DIR, 'output')
 CONFIG_FOLDER = os.path.join(DATA_DIR, 'config')
