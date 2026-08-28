@@ -81,6 +81,19 @@ OUTPUT_FOLDER = os.path.join(DATA_DIR, 'output')
 CONFIG_FOLDER = os.path.join(DATA_DIR, 'config')
 ALLOWED_EXTENSIONS = {'txt'}
 
+# Single source of truth for platform keys. Adding a platform previously meant
+# remembering several separate places; anything missed silently drops that
+# platform from a campaign.
+SUPPORTED_PLATFORMS = ('chatgpt', 'gemini', 'perplexity', 'claude')
+
+# Which env var holds each platform's credentials, for the /health check.
+PLATFORM_KEY_ENV = {
+    'chatgpt': ('OPENAI_API_KEY',),
+    'gemini': ('GEMINI_API_KEY',),
+    'perplexity': ('PERPLEXITY_API_KEY',),
+    'claude': ('ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'),
+}
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 os.makedirs(CONFIG_FOLDER, exist_ok=True)
@@ -165,7 +178,7 @@ def index():
             'target_brand': '',
             'competitors': '',
             'runs_per_query': 15,
-            'platforms': ['chatgpt', 'gemini', 'perplexity', 'claude']
+            'platforms': list(SUPPORTED_PLATFORMS)
         }
 
     return render_template('index.html', config=existing_config)
@@ -216,12 +229,8 @@ def configure():
         
         # Get platform selections
         selected_platforms = request.form.getlist('platforms')
-        platforms = {
-            'chatgpt': 'chatgpt' in selected_platforms,
-            'gemini': 'gemini' in selected_platforms,
-            'perplexity': 'perplexity' in selected_platforms,
-            'claude': 'claude' in selected_platforms
-        }
+        platforms = {name: name in selected_platforms
+                     for name in SUPPORTED_PLATFORMS}
         
         # Get queries from text area or file
         queries_text = request.form.get('queries_text', '').strip()
@@ -663,6 +672,41 @@ def run_analysis_background(resume=False):
         analysis_state['logs'].append(f"Details: {error_detail[:500]}")  # First 500 chars
         analysis_state['last_update'] = time.time()
         analysis_state['running'] = False
+
+
+@app.route('/health')
+def health():
+    """Deployment diagnostics -- what is this instance actually running?
+
+    Two services quietly running different commits, one of them on ephemeral
+    storage, is what cost a 3-hour campaign its report. This makes that
+    visible from outside with a single request, instead of having to infer it
+    from which checkboxes appear on a page.
+
+    Reports only whether each API key is PRESENT -- never any key value.
+    """
+    persistent = os.path.abspath(DATA_DIR) != os.path.abspath(PROJECT_ROOT)
+
+    try:
+        reports_on_disk = len([f for f in os.listdir(OUTPUT_FOLDER)
+                               if f.endswith('.xlsx')])
+    except OSError:
+        reports_on_disk = None
+
+    return jsonify({
+        # Render exposes the deployed SHA; 'unknown' means running elsewhere.
+        'commit': os.environ.get('RENDER_GIT_COMMIT', 'unknown')[:8],
+        'storage': 'persistent' if persistent else 'EPHEMERAL',
+        'data_dir': DATA_DIR,
+        'data_dir_env_set': bool(os.environ.get('DATA_DIR')),
+        'reports_on_disk': reports_on_disk,
+        'platforms_supported': list(SUPPORTED_PLATFORMS),
+        'api_keys_present': {
+            name: any(os.getenv(var) for var in env_vars)
+            for name, env_vars in PLATFORM_KEY_ENV.items()
+        },
+        'analysis_running': analysis_state.get('running', False),
+    })
 
 
 @app.route('/status')
